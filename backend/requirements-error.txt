@@ -1,0 +1,5 @@
+# error, skip install
+
+# Validation
+pydantic==2.4.2
+pydantic-settings==2.0.3
