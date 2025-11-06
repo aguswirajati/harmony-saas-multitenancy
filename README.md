@@ -1,4 +1,5 @@
-# 🚀 Harmony - SaaS Multi-Tenant BoilerplateEnterprise-grade SaaS boilerplate with multi-tenancy and branch management.
+# 🚀 Harmony - SaaS Multi-Tenant Boilerplate
+**Enterprise-grade SaaS boilerplate with multi-tenancy and branch management.**
 ## Features- ✅ Multi-tenant architecture
 - ✅ Branch management (HQ + sub-branches)
 - ✅ User management with RBAC
