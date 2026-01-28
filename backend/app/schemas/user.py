@@ -49,6 +49,8 @@ class UserResponse(UserInDB):
 class UserWithBranch(UserResponse):
     branch_name: Optional[str] = None
     branch_code: Optional[str] = None
+    tenant_name: Optional[str] = None
+    tenant_subdomain: Optional[str] = None
 
 class UserListResponse(BaseModel):
     users: List[UserWithBranch]

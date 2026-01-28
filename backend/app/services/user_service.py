@@ -1,13 +1,17 @@
 from sqlalchemy.orm import Session, joinedload
-from fastapi import HTTPException, status
+from sqlalchemy import func
+from fastapi import HTTPException, status, Request
 from typing import List, Optional, Tuple
 from uuid import UUID
 from datetime import datetime
 
 from app.models.user import User
 from app.models.branch import Branch
+from app.models.tenant import Tenant
 from app.core.security import get_password_hash, verify_password
 from app.schemas.user import UserCreate, UserUpdate, UserChangePassword, UserWithBranch
+from app.services.audit_service import AuditService
+from app.models.audit_log import AuditAction, AuditStatus
 
 class UserService:
     def __init__(self, db: Session):
@@ -68,9 +72,30 @@ class UserService:
         self,
         user_data: UserCreate,
         tenant_id: UUID,
-        current_user: User
+        current_user: User,
+        request: Request = None
     ) -> User:
         """Create new user"""
+
+        # Check subscription status
+        tenant = self.db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if tenant.subscription_status not in ('active', 'trial'):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your subscription is not active. Please contact your administrator."
+            )
+
+        # Check user limit
+        if tenant.max_users != -1:  # -1 = unlimited
+            active_count = self.db.query(func.count(User.id)).filter(
+                User.tenant_id == tenant_id,
+                User.is_active == True
+            ).scalar()
+            if active_count >= tenant.max_users:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"User limit reached ({tenant.max_users}). Upgrade your plan to add more users."
+                )
 
         # Check if email already exists
         existing = self.db.query(User).filter(
@@ -121,6 +146,24 @@ class UserService:
         self.db.commit()
         self.db.refresh(user)
 
+        # Log user creation
+        if request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                action=AuditAction.USER_CREATED,
+                resource="user",
+                resource_id=user.id,
+                details={
+                    "email": user.email,
+                    "role": user.role,
+                    "created_by": current_user.email
+                },
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
         return user
 
     def update_user(
@@ -128,7 +171,8 @@ class UserService:
         user_id: UUID,
         user_data: UserUpdate,
         tenant_id: UUID,
-        current_user: User
+        current_user: User,
+        request: Request = None
     ) -> User:
         """Update user"""
 
@@ -155,6 +199,9 @@ class UserService:
                     detail="Invalid branch"
                 )
 
+        # Track role change for audit
+        role_changed = user_data.role and user_data.role != user.role
+
         # Update fields
         update_data = user_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
@@ -174,13 +221,34 @@ class UserService:
         self.db.commit()
         self.db.refresh(user)
 
+        # Log user update
+        if request:
+            action = AuditAction.USER_ROLE_CHANGED if role_changed else AuditAction.USER_UPDATED
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                action=action,
+                resource="user",
+                resource_id=user.id,
+                details={
+                    "email": user.email,
+                    "updated_fields": list(update_data.keys()),
+                    "updated_by": current_user.email,
+                    "new_role": user.role if role_changed else None
+                },
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
         return user
 
     def delete_user(
         self,
         user_id: UUID,
         tenant_id: UUID,
-        current_user: User
+        current_user: User,
+        request: Request = None
     ) -> bool:
         """Soft delete user"""
 
@@ -205,6 +273,24 @@ class UserService:
         user.deleted_at = datetime.utcnow()
 
         self.db.commit()
+
+        # Log user deletion
+        if request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                action=AuditAction.USER_DELETED,
+                resource="user",
+                resource_id=user.id,
+                details={
+                    "email": user.email,
+                    "role": user.role,
+                    "deleted_by": current_user.email
+                },
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
 
         return True
 

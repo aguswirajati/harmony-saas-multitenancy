@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from uuid import UUID
 import logging
+from fastapi import Request
 
 from app.models.tenant import Tenant
 from app.models.user import User
@@ -23,6 +24,8 @@ from app.core.exceptions import (
     TenantNotFoundException, TenantExistsException,
     SubdomainTakenException, LimitExceededException
 )
+from app.services.audit_service import AuditService
+from app.models.audit_log import AuditAction, AuditStatus
 
 logger = logging.getLogger(__name__)
 
@@ -77,37 +80,37 @@ class TenantService:
     # CRUD OPERATIONS
     # ========================================================================
     
-    def create_tenant(self, tenant_data: TenantCreate) -> Tenant:
+    def create_tenant(self, tenant_data: TenantCreate, current_user: User = None, request: Request = None) -> Tenant:
         """
         Create new tenant with admin user and HQ branch (Super Admin only)
         """
         # Check subdomain uniqueness
         if self.db.query(Tenant).filter(Tenant.subdomain == tenant_data.subdomain).first():
             raise SubdomainTakenException(f"Subdomain '{tenant_data.subdomain}' already taken")
-        
+
         # Check email uniqueness
         if self.db.query(User).filter(User.email == tenant_data.admin_email).first():
             raise TenantExistsException(f"Email '{tenant_data.admin_email}' already exists")
-        
+
         try:
             # Create tenant
             tenant = Tenant(
                 name=tenant_data.name,
                 subdomain=tenant_data.subdomain,
-                domain=tenant_data.domain,
+                domain=tenant_data.domain or None,
                 tier=tenant_data.tier,
                 subscription_status="active",
                 max_users=tenant_data.max_users,
                 max_branches=tenant_data.max_branches,
                 max_storage_gb=tenant_data.max_storage_gb,
-                logo_url=tenant_data.logo_url,
+                logo_url=tenant_data.logo_url or None,
                 features={},
                 settings={},
                 meta_data={}
             )
             self.db.add(tenant)
             self.db.flush()  # Get tenant ID
-            
+
             # Create HQ branch
             hq_branch = Branch(
                 tenant_id=tenant.id,
@@ -118,7 +121,7 @@ class TenantService:
             )
             self.db.add(hq_branch)
             self.db.flush()  # Get branch ID
-            
+
             # Create admin user
             admin_user = User(
                 tenant_id=tenant.id,
@@ -133,13 +136,33 @@ class TenantService:
                 permissions=[]
             )
             self.db.add(admin_user)
-            
+
             self.db.commit()
             self.db.refresh(tenant)
-            
+
+            # Log tenant creation
+            if current_user and request:
+                AuditService.log_action(
+                    db=self.db,
+                    user_id=current_user.id,
+                    tenant_id=tenant.id,
+                    action=AuditAction.TENANT_CREATED,
+                    resource="tenant",
+                    resource_id=tenant.id,
+                    details={
+                        "tenant_name": tenant.name,
+                        "subdomain": tenant.subdomain,
+                        "tier": tenant.tier,
+                        "admin_email": admin_user.email,
+                        "created_by": "super_admin"
+                    },
+                    status=AuditStatus.SUCCESS,
+                    request=request
+                )
+
             logger.info(f"Created tenant: {tenant.subdomain} with admin: {tenant_data.admin_email}")
             return tenant
-            
+
         except Exception as e:
             self.db.rollback()
             logger.error(f"Failed to create tenant: {str(e)}")
@@ -195,28 +218,44 @@ class TenantService:
         
         return tenants, total
     
-    def update_tenant(self, tenant_id: UUID, update_data: TenantUpdate) -> Tenant:
+    def update_tenant(self, tenant_id: UUID, update_data: TenantUpdate, current_user: User = None, request: Request = None) -> Tenant:
         """Update tenant basic info"""
         tenant = self.get_tenant_by_id(tenant_id)
-        
+
         update_dict = update_data.model_dump(exclude_unset=True)
         for key, value in update_dict.items():
             setattr(tenant, key, value)
-        
+
         self.db.commit()
         self.db.refresh(tenant)
-        
+
+        # Log tenant update
+        if current_user and request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant.id,
+                action=AuditAction.TENANT_UPDATED,
+                resource="tenant",
+                resource_id=tenant.id,
+                details={"updated_fields": list(update_dict.keys()), "subdomain": tenant.subdomain},
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
         logger.info(f"Updated tenant: {tenant.subdomain}")
         return tenant
     
     def update_subscription(
-        self, 
-        tenant_id: UUID, 
-        subscription_data: TenantSubscriptionUpdate
+        self,
+        tenant_id: UUID,
+        subscription_data: TenantSubscriptionUpdate,
+        current_user: User = None,
+        request: Request = None
     ) -> Tenant:
         """Update tenant subscription (Super Admin only)"""
         tenant = self.get_tenant_by_id(tenant_id)
-        
+
         # Update subscription fields
         tenant.tier = subscription_data.tier
         tenant.subscription_status = subscription_data.subscription_status
@@ -225,10 +264,29 @@ class TenantService:
         tenant.max_storage_gb = subscription_data.max_storage_gb
         tenant.trial_ends_at = subscription_data.trial_ends_at
         tenant.subscription_ends_at = subscription_data.subscription_ends_at
-        
+
         self.db.commit()
         self.db.refresh(tenant)
-        
+
+        # Log subscription update
+        if current_user and request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant.id,
+                action=AuditAction.TENANT_SUBSCRIPTION_CHANGED,
+                resource="tenant",
+                resource_id=tenant.id,
+                details={
+                    "subdomain": tenant.subdomain,
+                    "new_tier": subscription_data.tier,
+                    "new_status": subscription_data.subscription_status,
+                    "max_users": subscription_data.max_users
+                },
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
         logger.info(f"Updated subscription for tenant: {tenant.subdomain} to tier: {subscription_data.tier}")
         return tenant
     
@@ -251,40 +309,75 @@ class TenantService:
     def update_status(
         self,
         tenant_id: UUID,
-        status_data: TenantStatusUpdate
+        status_data: TenantStatusUpdate,
+        current_user: User = None,
+        request: Request = None
     ) -> Tenant:
         """Activate/deactivate tenant (Super Admin only)"""
         tenant = self.get_tenant_by_id(tenant_id)
-        
+
         tenant.is_active = status_data.is_active
-        
+
         # Log the reason in metadata
         if status_data.reason:
             if not tenant.meta_data:
                 tenant.meta_data = {}
             tenant.meta_data['status_change_reason'] = status_data.reason
             tenant.meta_data['status_changed_at'] = datetime.utcnow().isoformat()
-        
+
         self.db.commit()
         self.db.refresh(tenant)
-        
+
+        # Log tenant status change
+        if current_user and request:
+            action = AuditAction.TENANT_ACTIVATED if status_data.is_active else AuditAction.TENANT_DEACTIVATED
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant.id,
+                action=action,
+                resource="tenant",
+                resource_id=tenant.id,
+                details={
+                    "subdomain": tenant.subdomain,
+                    "is_active": status_data.is_active,
+                    "reason": status_data.reason
+                },
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
         status_text = "activated" if status_data.is_active else "deactivated"
         logger.info(f"Tenant {tenant.subdomain} {status_text}")
         return tenant
     
-    def delete_tenant(self, tenant_id: UUID) -> bool:
+    def delete_tenant(self, tenant_id: UUID, current_user: User = None, request: Request = None) -> bool:
         """
         Soft delete tenant (sets is_active=False)
         Hard delete would use: self.db.delete(tenant)
         """
         tenant = self.get_tenant_by_id(tenant_id)
-        
+
         # Soft delete
         tenant.is_active = False
         tenant.deleted_at = datetime.utcnow()
-        
+
         self.db.commit()
-        
+
+        # Log tenant deletion
+        if current_user and request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant.id,
+                action=AuditAction.TENANT_DELETED,
+                resource="tenant",
+                resource_id=tenant.id,
+                details={"subdomain": tenant.subdomain, "deletion_type": "soft_delete"},
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
         logger.info(f"Deleted tenant: {tenant.subdomain}")
         return True
     
@@ -407,7 +500,40 @@ class TenantService:
                 Tenant.subscription_ends_at > now
             )
         ).scalar() or 0
-        
+
+        # Build dictionaries for frontend
+        tenants_by_tier = {
+            'free': free_tier,
+            'basic': basic_tier,
+            'premium': premium_tier,
+            'enterprise': enterprise_tier
+        }
+
+        # Count by subscription status
+        status_active = self.db.query(func.count(Tenant.id)).filter(
+            Tenant.subscription_status == 'active'
+        ).scalar() or 0
+        status_trial = self.db.query(func.count(Tenant.id)).filter(
+            Tenant.subscription_status == 'trial'
+        ).scalar() or 0
+        status_expired = self.db.query(func.count(Tenant.id)).filter(
+            Tenant.subscription_status == 'expired'
+        ).scalar() or 0
+        status_cancelled = self.db.query(func.count(Tenant.id)).filter(
+            Tenant.subscription_status == 'cancelled'
+        ).scalar() or 0
+        status_suspended = self.db.query(func.count(Tenant.id)).filter(
+            Tenant.subscription_status == 'suspended'
+        ).scalar() or 0
+
+        tenants_by_status = {
+            'active': status_active,
+            'trial': status_trial,
+            'expired': status_expired,
+            'cancelled': status_cancelled,
+            'suspended': status_suspended
+        }
+
         return SystemStats(
             total_tenants=total_tenants,
             active_tenants=active_tenants,
@@ -417,6 +543,8 @@ class TenantService:
             basic_tier_count=basic_tier,
             premium_tier_count=premium_tier,
             enterprise_tier_count=enterprise_tier,
+            tenants_by_tier=tenants_by_tier,
+            tenants_by_status=tenants_by_status,
             total_users=total_users,
             total_branches=total_branches,
             tenants_created_today=created_today,

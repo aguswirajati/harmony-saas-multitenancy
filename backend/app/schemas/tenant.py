@@ -28,9 +28,9 @@ class TenantBase(BaseModel):
 class TenantCreate(TenantBase):
     """Schema for creating new tenant (Super Admin only)"""
     tier: str = Field(default="free", description="Subscription tier")
-    max_users: int = Field(default=5, ge=1, description="Maximum users allowed")
-    max_branches: int = Field(default=1, ge=1, description="Maximum branches allowed")
-    max_storage_gb: int = Field(default=1, ge=1, description="Storage limit in GB")
+    max_users: int = Field(default=5, ge=-1, description="Maximum users allowed (-1 for unlimited)")
+    max_branches: int = Field(default=1, ge=-1, description="Maximum branches allowed (-1 for unlimited)")
+    max_storage_gb: int = Field(default=1, ge=-1, description="Storage limit in GB (-1 for unlimited)")
     
     # Admin user for the tenant
     admin_email: EmailStr = Field(..., description="Admin user email")
@@ -65,9 +65,9 @@ class TenantSubscriptionUpdate(BaseModel):
     """Schema for updating subscription (Super Admin only)"""
     tier: str = Field(..., description="Subscription tier")
     subscription_status: str = Field(default="active", description="Subscription status")
-    max_users: int = Field(..., ge=1, description="Maximum users")
-    max_branches: int = Field(..., ge=1, description="Maximum branches")
-    max_storage_gb: int = Field(..., ge=1, description="Storage limit in GB")
+    max_users: int = Field(..., ge=-1, description="Maximum users (-1 for unlimited)")
+    max_branches: int = Field(..., ge=-1, description="Maximum branches (-1 for unlimited)")
+    max_storage_gb: int = Field(..., ge=-1, description="Storage limit in GB (-1 for unlimited)")
     trial_ends_at: Optional[datetime] = None
     subscription_ends_at: Optional[datetime] = None
 
@@ -130,6 +130,10 @@ class TenantResponse(TenantBase):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime]
+
+    # Usage stats (computed)
+    user_count: int = 0
+    branch_count: int = 0
 
     class Config:
         from_attributes = True
@@ -208,22 +212,26 @@ class SystemStats(BaseModel):
     active_tenants: int = 0
     inactive_tenants: int = 0
     trial_tenants: int = 0
-    
-    # By tier
+
+    # By tier (individual counts for backwards compatibility)
     free_tier_count: int = 0
     basic_tier_count: int = 0
     premium_tier_count: int = 0
     enterprise_tier_count: int = 0
-    
+
+    # By tier and status (dictionaries for frontend)
+    tenants_by_tier: Dict[str, int] = {}
+    tenants_by_status: Dict[str, int] = {}
+
     # Users & Branches
     total_users: int = 0
     total_branches: int = 0
-    
+
     # Recent activity
     tenants_created_today: int = 0
     tenants_created_this_week: int = 0
     tenants_created_this_month: int = 0
-    
+
     # Expiring soon
     trials_expiring_soon: int = 0
     subscriptions_expiring_soon: int = 0

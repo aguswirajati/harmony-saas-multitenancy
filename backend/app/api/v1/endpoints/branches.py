@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
@@ -46,6 +46,7 @@ async def list_branches(
 @router.post("", response_model=BranchResponse, status_code=status.HTTP_201_CREATED)
 async def create_branch(
     branch_data: BranchCreate,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     current_tenant: Tenant = Depends(get_current_tenant),
     db: Session = Depends(get_db)
@@ -59,7 +60,8 @@ async def create_branch(
     branch = branch_service.create_branch(
         branch_data=branch_data,
         tenant_id=current_tenant.id,
-        current_user=current_user
+        current_user=current_user,
+        request=request
     )
 
     return BranchResponse.model_validate(branch)
@@ -84,6 +86,7 @@ async def get_branch(
 async def update_branch(
     branch_id: UUID,
     branch_data: BranchUpdate,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     current_tenant: Tenant = Depends(get_current_tenant),
     db: Session = Depends(get_db)
@@ -98,7 +101,8 @@ async def update_branch(
         branch_id=branch_id,
         branch_data=branch_data,
         tenant_id=current_tenant.id,
-        current_user=current_user
+        current_user=current_user,
+        request=request
     )
 
     return BranchResponse.model_validate(branch)
@@ -106,6 +110,7 @@ async def update_branch(
 @router.delete("/{branch_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_branch(
     branch_id: UUID,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     current_tenant: Tenant = Depends(get_current_tenant),
     db: Session = Depends(get_db)
@@ -121,7 +126,8 @@ async def delete_branch(
     branch_service.delete_branch(
         branch_id=branch_id,
         tenant_id=current_tenant.id,
-        current_user=current_user
+        current_user=current_user,
+        request=request
     )
 
     return None

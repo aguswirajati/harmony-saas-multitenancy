@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
-from datetime import datetime
+from fastapi import HTTPException, status, Request
+from datetime import datetime, timedelta
 from uuid import UUID
+import secrets
 
 from app.models.user import User
 from app.models.tenant import Tenant
@@ -10,17 +11,28 @@ from app.core.security import (
     verify_password,
     get_password_hash,
     create_access_token,
-    create_refresh_token
+    create_refresh_token,
+    decode_token
 )
-from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest, RegisterResponse
+from app.schemas.auth import (
+    LoginRequest, LoginResponse, RegisterRequest, RegisterResponse,
+    ForgotPasswordRequest, ForgotPasswordResponse,
+    ResetPasswordRequest, ResetPasswordResponse,
+    VerifyEmailRequest, VerifyEmailResponse,
+    RefreshTokenRequest, RefreshTokenResponse
+)
 from app.schemas.token import Token
 from app.schemas.user import UserResponse
+from app.services.email_service import email_service
+from app.services.audit_service import AuditService
+from app.models.audit_log import AuditAction, AuditStatus
+from app.config import settings
 
 class AuthService:
     def __init__(self, db: Session):
         self.db = db
 
-    def login(self, login_data: LoginRequest) -> LoginResponse:
+    def login(self, login_data: LoginRequest, request: Request = None) -> LoginResponse:
         """Authenticate user and return tokens"""
 
         # Get tenant if subdomain provided
@@ -49,6 +61,19 @@ class AuthService:
         user = query.first()
 
         if not user or not verify_password(login_data.password, user.password_hash):
+            # Log failed login attempt if user exists
+            if user and request:
+                AuditService.log_action(
+                    db=self.db,
+                    user_id=None,  # Don't associate with user for failed attempt
+                    tenant_id=user.tenant_id,
+                    action=AuditAction.LOGIN_FAILED,
+                    resource="user",
+                    resource_id=user.id,
+                    details={"email": login_data.email, "reason": "incorrect_password"},
+                    status=AuditStatus.FAILURE,
+                    request=request
+                )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
@@ -71,12 +96,29 @@ class AuthService:
         user.last_login_at = datetime.utcnow()
         self.db.commit()
 
+        # Log successful login
+        AuditService.log_action(
+            db=self.db,
+            user_id=user.id,
+            tenant_id=user.tenant_id,
+            action=AuditAction.LOGIN,
+            resource="user",
+            resource_id=user.id,
+            details={
+                "email": user.email,
+                "role": user.role,
+                "is_super_admin": user.is_super_admin
+            },
+            status=AuditStatus.SUCCESS,
+            request=request
+        )
+
         # Create tokens with conditional tenant_id
         token_data = {
             "sub": str(user.id),
             "role": user.role
         }
-        
+
         # Only add tenant_id if user has a tenant
         if tenant:
             token_data["tenant_id"] = str(tenant.id)
@@ -103,7 +145,26 @@ class AuthService:
             )
         )
 
-    def register(self, register_data: RegisterRequest) -> RegisterResponse:
+    async def logout(self, user: User, request: Request = None) -> dict:
+        """Log user logout for audit purposes"""
+
+        # Log logout event
+        if request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=user.id,
+                tenant_id=user.tenant_id,
+                action=AuditAction.LOGOUT,
+                resource="user",
+                resource_id=user.id,
+                details={"email": user.email},
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
+        return {"message": "Logged out successfully"}
+
+    async def register(self, register_data: RegisterRequest, request: Request = None) -> RegisterResponse:
         """Register new tenant with admin user"""
 
         # Check if subdomain already exists
@@ -164,12 +225,61 @@ class AuthService:
                 full_name=register_data.admin_name,
                 role="admin",
                 default_branch_id=hq_branch.id,
-                is_verified=True,
+                is_verified=True,  # Auto-verify admin during registration
                 email_verified_at=datetime.utcnow()
             )
             self.db.add(admin_user)
             self.db.commit()
             self.db.refresh(admin_user)
+
+            # Log tenant creation and user registration
+            if request:
+                # Log tenant creation
+                AuditService.log_action(
+                    db=self.db,
+                    user_id=admin_user.id,
+                    tenant_id=tenant.id,
+                    action=AuditAction.TENANT_CREATED,
+                    resource="tenant",
+                    resource_id=tenant.id,
+                    details={
+                        "tenant_name": tenant.name,
+                        "subdomain": tenant.subdomain,
+                        "tier": tenant.tier
+                    },
+                    status=AuditStatus.SUCCESS,
+                    request=request
+                )
+
+                # Log user registration
+                AuditService.log_action(
+                    db=self.db,
+                    user_id=admin_user.id,
+                    tenant_id=tenant.id,
+                    action=AuditAction.USER_CREATED,
+                    resource="user",
+                    resource_id=admin_user.id,
+                    details={
+                        "email": admin_user.email,
+                        "role": admin_user.role,
+                        "via": "registration"
+                    },
+                    status=AuditStatus.SUCCESS,
+                    request=request
+                )
+
+            # Send welcome email (don't fail registration if email fails)
+            try:
+                await email_service.send_welcome_email(
+                    to_email=admin_user.email,
+                    user_name=admin_user.full_name,
+                    tenant_name=tenant.name,
+                    verification_url=None  # Already verified
+                )
+            except Exception as e:
+                # Log error but don't fail registration
+                from loguru import logger
+                logger.error(f"Failed to send welcome email: {str(e)}")
 
             # Create tokens
             token_data = {
@@ -201,4 +311,215 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Registration failed: {str(e)}"
+            )
+
+    async def forgot_password(self, request: ForgotPasswordRequest) -> ForgotPasswordResponse:
+        """Generate password reset token and send email"""
+
+        # Find user by email
+        user = self.db.query(User).filter(
+            User.email == request.email,
+            User.is_active == True
+        ).first()
+
+        # Always return success message (don't reveal if email exists)
+        if not user:
+            return ForgotPasswordResponse(
+                message="If an account exists with this email, you will receive a password reset link."
+            )
+
+        # Generate secure reset token
+        reset_token = secrets.token_urlsafe(32)
+        reset_expires = datetime.utcnow() + timedelta(hours=1)
+
+        # Save token to database
+        user.reset_token = reset_token
+        user.reset_token_expires = reset_expires
+        self.db.commit()
+
+        # Log password reset request
+        AuditService.log_action(
+            db=self.db,
+            user_id=user.id,
+            tenant_id=user.tenant_id,
+            action=AuditAction.PASSWORD_RESET_REQUEST,
+            resource="user",
+            resource_id=user.id,
+            details={"email": user.email},
+            status=AuditStatus.SUCCESS
+        )
+
+        # Send password reset email
+        await email_service.send_password_reset_email(
+            to_email=user.email,
+            user_name=user.full_name or user.email,
+            reset_token=reset_token,
+            expires_in_minutes=60
+        )
+
+        return ForgotPasswordResponse(
+            message="If an account exists with this email, you will receive a password reset link."
+        )
+
+    def reset_password(self, reset_request: ResetPasswordRequest, request: Request = None) -> ResetPasswordResponse:
+        """Reset password using valid token"""
+
+        # Find user with matching token
+        user = self.db.query(User).filter(
+            User.reset_token == reset_request.token,
+            User.is_active == True
+        ).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset token"
+            )
+
+        # Check if token has expired
+        if user.reset_token_expires and user.reset_token_expires < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset token has expired. Please request a new one."
+            )
+
+        # Update password
+        user.password_hash = get_password_hash(reset_request.new_password)
+        user.reset_token = None
+        user.reset_token_expires = None
+        self.db.commit()
+
+        # Log successful password reset
+        if request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=user.id,
+                tenant_id=user.tenant_id,
+                action=AuditAction.PASSWORD_RESET,
+                resource="user",
+                resource_id=user.id,
+                details={"email": user.email},
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
+        return ResetPasswordResponse(
+            message="Password has been reset successfully. You can now login with your new password."
+        )
+
+    async def verify_email(self, request: VerifyEmailRequest) -> VerifyEmailResponse:
+        """Verify user email with token"""
+
+        # Find user with matching verification token
+        user = self.db.query(User).filter(
+            User.verification_token == request.token,
+            User.is_active == True
+        ).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification token"
+            )
+
+        # Check if already verified
+        if user.is_verified:
+            return VerifyEmailResponse(
+                message="Email already verified. You can login to your account."
+            )
+
+        # Verify email
+        user.is_verified = True
+        user.email_verified_at = datetime.utcnow()
+        user.verification_token = None
+        self.db.commit()
+
+        return VerifyEmailResponse(
+            message="Email verified successfully! You can now login to your account."
+        )
+
+    async def resend_verification(self, email: str) -> dict:
+        """Resend email verification link"""
+
+        # Find user by email
+        user = self.db.query(User).filter(
+            User.email == email,
+            User.is_active == True
+        ).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        if user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already verified"
+            )
+
+        # Generate new verification token
+        verification_token = secrets.token_urlsafe(32)
+        user.verification_token = verification_token
+        self.db.commit()
+
+        # Send verification email
+        await email_service.send_verification_email(
+            to_email=user.email,
+            user_name=user.full_name or user.email,
+            verification_token=verification_token
+        )
+
+        return {"message": "Verification email sent successfully"}
+
+    def refresh_token(self, request: RefreshTokenRequest) -> RefreshTokenResponse:
+        """Refresh access token using refresh token"""
+
+        try:
+            # Decode refresh token
+            payload = decode_token(request.refresh_token)
+            user_id = payload.get("sub")
+
+            if not user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token"
+                )
+
+            # Find user
+            user = self.db.query(User).filter(
+                User.id == UUID(user_id),
+                User.is_active == True
+            ).first()
+
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found"
+                )
+
+            # Create new tokens
+            token_data = {
+                "sub": str(user.id),
+                "role": user.role
+            }
+
+            # Add tenant_id if user has one
+            if user.tenant_id:
+                token_data["tenant_id"] = str(user.tenant_id)
+
+            new_access_token = create_access_token(token_data)
+            new_refresh_token = create_refresh_token(token_data)
+
+            return RefreshTokenResponse(
+                access_token=new_access_token,
+                refresh_token=new_refresh_token,
+                token_type="bearer"
+            )
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired refresh token"
             )

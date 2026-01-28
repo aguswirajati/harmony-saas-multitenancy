@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
 
 from app.core.database import get_db
-from app.api.deps import get_current_user, get_current_tenant, get_admin_user
+from app.api.deps import get_current_user, get_current_tenant, get_admin_user, get_super_admin_user
 from app.models.user import User
 from app.models.tenant import Tenant
 from app.schemas.user import (
@@ -18,6 +18,7 @@ from app.schemas.user import (
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
+admin_router = APIRouter(prefix="/admin/users", tags=["Admin - Users"])
 
 @router.get("", response_model=UserListResponse)
 async def list_users(
@@ -71,6 +72,7 @@ async def list_users(
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     current_tenant: Tenant = Depends(get_current_tenant),
     db: Session = Depends(get_db)
@@ -84,7 +86,8 @@ async def create_user(
     user = user_service.create_user(
         user_data=user_data,
         tenant_id=current_tenant.id,
-        current_user=current_user
+        current_user=current_user,
+        request=request
     )
 
     return UserResponse.model_validate(user)
@@ -109,6 +112,7 @@ async def get_user(
 async def update_user(
     user_id: UUID,
     user_data: UserUpdate,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     current_tenant: Tenant = Depends(get_current_tenant),
     db: Session = Depends(get_db)
@@ -123,7 +127,8 @@ async def update_user(
         user_id=user_id,
         user_data=user_data,
         tenant_id=current_tenant.id,
-        current_user=current_user
+        current_user=current_user,
+        request=request
     )
 
     return UserResponse.model_validate(user)
@@ -131,6 +136,7 @@ async def update_user(
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: UUID,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     current_tenant: Tenant = Depends(get_current_tenant),
     db: Session = Depends(get_db)
@@ -146,7 +152,8 @@ async def delete_user(
     user_service.delete_user(
         user_id=user_id,
         tenant_id=current_tenant.id,
-        current_user=current_user
+        current_user=current_user,
+        request=request
     )
 
     return None
@@ -176,3 +183,71 @@ async def change_password(
     )
 
     return {"message": "Password changed successfully"}
+
+
+# ============================================================================
+# ADMIN ROUTES - Super Admin Only
+# ============================================================================
+
+@admin_router.get("", response_model=UserListResponse)
+async def list_all_users(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    search: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    tenant_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_super_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all users across all tenants (Super Admin only)
+
+    - **skip**: Number of records to skip
+    - **limit**: Maximum number of records
+    - **search**: Search by name or email
+    - **role**: Filter by role
+    - **tenant_id**: Filter by tenant
+    """
+    from sqlalchemy import or_, and_
+
+    query = db.query(User).filter(User.is_active == True)
+
+    # Apply filters
+    if search:
+        search_filter = or_(
+            User.email.ilike(f"%{search}%"),
+            User.full_name.ilike(f"%{search}%")
+        )
+        query = query.filter(search_filter)
+
+    if role:
+        query = query.filter(User.role == role)
+
+    if tenant_id:
+        tenant_uuid = UUID(tenant_id)
+        query = query.filter(User.tenant_id == tenant_uuid)
+
+    # Get total count
+    total = query.count()
+
+    # Get paginated results
+    users = query.offset(skip).limit(limit).all()
+
+    # Convert to response with branch and tenant info
+    users_with_info = []
+    for user in users:
+        user_dict = UserWithBranch.model_validate(user).model_dump()
+        if user.default_branch:
+            user_dict['branch_name'] = user.default_branch.name
+            user_dict['branch_code'] = user.default_branch.code
+        if user.tenant:
+            user_dict['tenant_name'] = user.tenant.name
+            user_dict['tenant_subdomain'] = user.tenant.subdomain
+        users_with_info.append(UserWithBranch(**user_dict))
+
+    return UserListResponse(
+        users=users_with_info,
+        total=total,
+        page=skip // limit + 1,
+        page_size=limit
+    )

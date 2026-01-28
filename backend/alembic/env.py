@@ -10,7 +10,7 @@ from app.config import settings
 from app.core.database import Base
 
 # Import semua models agar Alembic detect
-from app.models import Tenant, Branch, User
+from app.models import Tenant, Branch, User, AuditLog
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

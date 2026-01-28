@@ -1,12 +1,16 @@
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from sqlalchemy import func
+from fastapi import HTTPException, status, Request
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
 from app.models.branch import Branch
 from app.models.user import User
+from app.models.tenant import Tenant
 from app.schemas.branch import BranchCreate, BranchUpdate, BranchResponse
+from app.services.audit_service import AuditService
+from app.models.audit_log import AuditAction, AuditStatus
 
 class BranchService:
     def __init__(self, db: Session):
@@ -56,9 +60,30 @@ class BranchService:
         self,
         branch_data: BranchCreate,
         tenant_id: UUID,
-        current_user: User
+        current_user: User,
+        request: Request = None
     ) -> Branch:
         """Create new branch"""
+
+        # Check subscription status
+        tenant = self.db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if tenant.subscription_status not in ('active', 'trial'):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your subscription is not active. Please contact your administrator."
+            )
+
+        # Check branch limit
+        if tenant.max_branches != -1:  # -1 = unlimited
+            active_count = self.db.query(func.count(Branch.id)).filter(
+                Branch.tenant_id == tenant_id,
+                Branch.is_active == True
+            ).scalar()
+            if active_count >= tenant.max_branches:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Branch limit reached ({tenant.max_branches}). Upgrade your plan to add more branches."
+                )
 
         # Check if code already exists for this tenant
         existing = self.db.query(Branch).filter(
@@ -82,6 +107,23 @@ class BranchService:
         self.db.commit()
         self.db.refresh(branch)
 
+        # Log audit
+        AuditService.log_action(
+            db=self.db,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            action=AuditAction.BRANCH_CREATED,
+            resource="branch",
+            resource_id=branch.id,
+            details={
+                "name": branch.name,
+                "code": branch.code,
+                "is_hq": branch.is_hq
+            },
+            status=AuditStatus.SUCCESS,
+            request=request
+        )
+
         return branch
 
     def update_branch(
@@ -89,7 +131,8 @@ class BranchService:
         branch_id: UUID,
         branch_data: BranchUpdate,
         tenant_id: UUID,
-        current_user: User
+        current_user: User,
+        request: Request = None
     ) -> Branch:
         """Update branch"""
 
@@ -119,13 +162,31 @@ class BranchService:
         self.db.commit()
         self.db.refresh(branch)
 
+        # Log audit
+        AuditService.log_action(
+            db=self.db,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            action=AuditAction.BRANCH_UPDATED,
+            resource="branch",
+            resource_id=branch.id,
+            details={
+                "name": branch.name,
+                "code": branch.code,
+                "changes": update_data
+            },
+            status=AuditStatus.SUCCESS,
+            request=request
+        )
+
         return branch
 
     def delete_branch(
         self,
         branch_id: UUID,
         tenant_id: UUID,
-        current_user: User
+        current_user: User,
+        request: Request = None
     ) -> bool:
         """Soft delete branch"""
 
@@ -151,10 +212,30 @@ class BranchService:
                 detail=f"Cannot delete branch with {users_count} active user(s). Please reassign users first."
             )
 
+        # Store branch info for audit before deletion
+        branch_name = branch.name
+        branch_code = branch.code
+
         # Soft delete
         branch.is_active = False
         branch.deleted_at = datetime.utcnow()
 
         self.db.commit()
+
+        # Log audit
+        AuditService.log_action(
+            db=self.db,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            action=AuditAction.BRANCH_DELETED,
+            resource="branch",
+            resource_id=branch_id,
+            details={
+                "name": branch_name,
+                "code": branch_code
+            },
+            status=AuditStatus.SUCCESS,
+            request=request
+        )
 
         return True

@@ -68,6 +68,11 @@ class User(Base, BaseModel):
     email_verified_at = Column(DateTime(timezone=True))
     last_login_at = Column(DateTime(timezone=True))
 
+    # Email verification and password reset tokens
+    verification_token = Column(String(255), nullable=True)
+    reset_token = Column(String(255), nullable=True)
+    reset_token_expires = Column(DateTime(timezone=True), nullable=True)
+
     # Metadata (renamed from metadata to avoid SQLAlchemy conflict)
     meta_data = Column(JSON, default={})
 
