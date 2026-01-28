@@ -1,19 +1,152 @@
-# 🚀 Harmony - SaaS Multi-Tenant Boilerplate
-**Enterprise-grade SaaS boilerplate with multi-tenancy and branch management.**
-## Features- ✅ Multi-tenant architecture
-- ✅ Branch management (HQ + sub-branches)
-- ✅ User management with RBAC
-- ✅ JWT authentication
-- ✅ Responsive UI (mobile-ready)
-- ✅ PostgreSQL with RLS
-- ✅ Redis caching ready
-- ✅ API-first design
-## Tech Stack- **Backend**: Python FastAPI + SQLAlchemy + PostgreSQL
-- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
-- **Auth**: JWT tokens with role-based access
-- **Database**: PostgreSQL 15+ with Row Level Security
-- **Cache**: Redis 7+
-## Quick Start[Link to full setup instructions]## DocumentationSee [HANDOVER.md](HANDOVER.md) for complete documentation
-## Roadmap- Phase 6: Tenant Management (in progress)
-- Phase 7+: Business Modules (inventory, POS, CRM, etc.)
-## LicenseMIT
+# Harmony - SaaS Multi-Tenant Boilerplate
+
+Enterprise-grade multi-tenant SaaS boilerplate with branch management, built with **FastAPI** and **Next.js**.
+
+## Features
+
+### Multi-Tenancy
+- Shared database with logical tenant isolation via `tenant_id` foreign keys
+- Three-tier user model: Super Admin, Tenant Admin, Staff
+- Per-tenant subscription tiers with user/branch limits (free, basic, premium, enterprise)
+- Tenant feature flags (JSON-based toggles)
+
+### Authentication & Security
+- JWT authentication with access tokens (30 min) and refresh tokens (7 days)
+- Automatic token refresh via axios interceptors
+- Password reset flow with email tokens
+- Email verification on registration
+- Redis-based rate limiting (sliding window algorithm)
+- Input validation: password strength, SQL injection, XSS prevention
+- Role-based access control (RBAC)
+
+### Super Admin System
+- Tenant management (create, edit, activate/deactivate, delete)
+- Subscription tier management with limit enforcement
+- Feature flag toggling per tenant
+- System-wide statistics dashboard
+- Cross-tenant user listing
+- Audit log viewer
+- Database tools (seed, reset)
+
+### Tenant Dashboard
+- Organization settings (name, domain, logo)
+- User management with CRUD operations
+- Branch management (HQ + sub-branches)
+- Subscription usage overview
+- Tier limit pre-check dialogs
+
+### Infrastructure
+- Comprehensive audit logging (all CRUD, auth events, security events)
+- Email service with responsive HTML templates (welcome, reset, verify, invite)
+- Global error handling with standardized responses
+- Request logging with unique request IDs
+- Health check endpoints (`/health`, `/health/detailed`)
+- Error boundaries and custom error pages (404, 500)
+
+## Tech Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Backend | Python + FastAPI | 0.120.2 |
+| ORM | SQLAlchemy | 2.0.44 |
+| Validation | Pydantic | 2.12+ |
+| Frontend | Next.js + React | 16.0.1 / 19.2.0 |
+| Language | TypeScript | 5.x |
+| Styling | Tailwind CSS | 4.x |
+| UI Components | Radix UI | 50+ components |
+| State | Zustand + React Query | - |
+| Database | PostgreSQL | 15+ |
+| Cache | Redis | 7+ |
+| Auth | JWT (PyJWT) | - |
+
+## Quick Start
+
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 15+
+- Redis 7+ (optional, needed for rate limiting)
+
+### Backend Setup
+
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or: venv\Scripts\activate  # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your DATABASE_URL, SECRET_KEY, etc.
+
+# Run migrations
+alembic upgrade head
+
+# Start development server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+# Opens at http://localhost:3000
+```
+
+### First Steps
+
+1. Register a new tenant at `/register`
+2. Log in at `/login`
+3. For super admin access, create one via `python scripts/create_super_admin.py`
+
+## Architecture
+
+```
+backend/
+  app/
+    api/v1/endpoints/   # Route handlers (thin controllers)
+    core/               # Security, database, validators
+    middleware/          # Rate limiter, error handler, request logger
+    models/             # SQLAlchemy ORM models
+    schemas/            # Pydantic request/response schemas
+    services/           # Business logic layer
+    templates/          # Email templates (Jinja2)
+
+frontend/
+  src/
+    app/(auth)/admin/   # Super admin pages
+    app/(dashboard)/    # Tenant user pages
+    app/(public)/       # Login, register, password reset
+    components/         # React components (ui/, admin/, tenant/)
+    lib/api/            # API client with auth interceptors
+    lib/store/          # Zustand state stores
+```
+
+**Key principle**: Shared database, logical isolation. All tenant data filtered by `tenant_id` at the service layer. Super admins specify target tenant via `X-Tenant-ID` header.
+
+## API Documentation
+
+When the backend is running:
+- Swagger UI: http://localhost:8000/api/docs
+- ReDoc: http://localhost:8000/api/redoc
+
+## Project Status
+
+See [docs/PROJECT-STATUS.md](docs/PROJECT-STATUS.md) for detailed status, known issues, and roadmap.
+
+For AI development guidance, see [CLAUDE.md](CLAUDE.md).
+
+## License
+
+MIT
