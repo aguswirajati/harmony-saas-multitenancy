@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { userAPI } from '@/lib/api/users';
 import { branchAPI } from '@/lib/api/branches';
 import { UserWithBranch } from '@/types/user';
@@ -24,12 +25,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Edit, Trash2, Users as UsersIcon, Shield } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users as UsersIcon, Shield, AlertTriangle, ArrowRight } from 'lucide-react';
 import { UserDialog } from '@/components/features/users/UserDialog';
 import { DeleteUserDialog } from '@/components/features/users/DeleteUserDialog';
 import { useAuthStore } from '@/lib/store/authStore';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import Link from 'next/link';
 
 export default function UsersPage() {
+  const queryClient = useQueryClient();
   const { user: currentUser } = useAuthStore();
   const [users, setUsers] = useState<UserWithBranch[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -42,6 +53,8 @@ export default function UsersPage() {
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<{ current_count: number; limit: number } | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserWithBranch | null>(null);
 
   const loadBranches = async () => {
@@ -79,7 +92,17 @@ export default function UsersPage() {
     loadUsers();
   }, [search, roleFilter, branchFilter]);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    try {
+      const result = await userAPI.checkLimit();
+      if (!result.can_add) {
+        setLimitInfo({ current_count: result.current_count, limit: result.limit });
+        setLimitDialogOpen(true);
+        return;
+      }
+    } catch {
+      // If limit check fails, allow creating (backend will still enforce)
+    }
     setSelectedUser(null);
     setDialogOpen(true);
   };
@@ -99,6 +122,7 @@ export default function UsersPage() {
     setSelectedUser(null);
     if (success) {
       loadUsers();
+      queryClient.invalidateQueries({ queryKey: ['tenant-usage'] });
     }
   };
 
@@ -107,6 +131,7 @@ export default function UsersPage() {
     setSelectedUser(null);
     if (success) {
       loadUsers();
+      queryClient.invalidateQueries({ queryKey: ['tenant-usage'] });
     }
   };
 
@@ -368,6 +393,39 @@ export default function UsersPage() {
         onClose={handleDeleteDialogClose}
         user={selectedUser}
       />
+
+      {/* Limit Reached Dialog */}
+      <Dialog open={limitDialogOpen} onOpenChange={setLimitDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-amber-600" />
+              </div>
+              <div>
+                <DialogTitle>User Limit Reached</DialogTitle>
+                <DialogDescription className="mt-1">
+                  You&apos;ve used {limitInfo?.current_count} of {limitInfo?.limit} users allowed on your current plan.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
+            Upgrade your subscription to add more users. Visit the Settings page to view available plans.
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setLimitDialogOpen(false)}>
+              Close
+            </Button>
+            <Link href="/settings?tab=subscription">
+              <Button>
+                View Plans
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

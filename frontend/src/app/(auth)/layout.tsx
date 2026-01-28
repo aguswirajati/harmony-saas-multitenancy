@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 
@@ -8,12 +8,16 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, checkAuth, isAuthenticated } = useAuthStore();
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     checkAuth();
+    setAuthChecked(true);
   }, [checkAuth]);
 
   useEffect(() => {
+    if (!authChecked) return;
+
     if (!isAuthenticated) {
       router.replace('/login');
       return;
@@ -22,7 +26,6 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
     if (user) {
       const isSuperAdmin = user.role === 'super_admin';
       const isOnAdminPath = pathname.startsWith('/admin');
-      const isOnDashboardPath = pathname.startsWith('/dashboard') || pathname === '/';
 
       if (isSuperAdmin && !isOnAdminPath) {
         router.replace('/admin');
@@ -30,7 +33,12 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         router.replace('/dashboard');
       }
     }
-  }, [user, pathname, router, isAuthenticated]);
+  }, [user, pathname, router, isAuthenticated, authChecked]);
+
+  // Don't render anything until auth state is resolved
+  if (!authChecked || !isAuthenticated) {
+    return null;
+  }
 
   return <>{children}</>;
 }

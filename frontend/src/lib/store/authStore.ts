@@ -84,7 +84,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     const user = authAPI.getStoredUser();
     const tenant = authAPI.getStoredTenant();
 
-    if (user && tenant) {
+    // Super admins don't need tenant to authenticate
+    if (user && (user.role === 'super_admin' || tenant)) {
       set({
         user,
         tenant,

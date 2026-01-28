@@ -102,7 +102,7 @@ export default function AdminDashboardPage() {
               <Link href="/admin/tenants/new">Create First Tenant</Link>
             </Button>
             <Button size="sm" variant="outline" asChild>
-              <Link href="/admin/docs">View Documentation</Link>
+              <a href="http://localhost:8000/api/docs" target="_blank" rel="noopener noreferrer">View API Docs</a>
             </Button>
           </div>
         </CardContent>

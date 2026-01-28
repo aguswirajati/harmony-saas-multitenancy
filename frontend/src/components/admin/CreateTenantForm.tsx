@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -43,9 +43,9 @@ const createTenantSchema = z.object({
   
   // Subscription
   tier: z.enum(['free', 'basic', 'premium', 'enterprise']),
-  max_users: z.number().min(1).optional(),
-  max_branches: z.number().min(1).optional(),
-  max_storage_gb: z.number().min(1).optional(),
+  max_users: z.number().min(-1).optional(),
+  max_branches: z.number().min(-1).optional(),
+  max_storage_gb: z.number().min(-1).optional(),
   
   // Admin User
   admin_email: z.string().email('Must be a valid email address'),
@@ -66,6 +66,7 @@ const tierPresets = {
 
 export function CreateTenantForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [showSuccess, setShowSuccess] = useState(false);
 
   const {
@@ -100,6 +101,10 @@ export function CreateTenantForm() {
   const mutation = useMutation({
     mutationFn: tenantsAPI.createTenant,
     onSuccess: (data) => {
+      // Invalidate tenants and users query cache so lists refresh
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+
       setShowSuccess(true);
       toast.success('Tenant created successfully!', {
         description: `${data.name} has been created with subdomain: ${data.subdomain}`,

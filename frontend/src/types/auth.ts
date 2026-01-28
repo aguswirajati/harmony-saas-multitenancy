@@ -29,7 +29,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   user: User;
-  tenant: Tenant;
+  tenant: Tenant | null; // Super admins may not have a tenant
   tokens: {
     access_token: string;
     refresh_token: string;
@@ -48,7 +48,7 @@ export interface RegisterRequest {
 export interface RegisterResponse {
   message: string;
   user: User;
-  tenant: Tenant;
+  tenant: Tenant | null; // Super admins may not have a tenant
   tokens: {
     access_token: string;
     refresh_token: string;

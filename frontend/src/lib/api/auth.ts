@@ -8,15 +8,20 @@ export const authAPI = {
     // Store tokens and context
     apiClient.setAccessToken(response.tokens.access_token);
     apiClient.setRefreshToken(response.tokens.refresh_token);
-    if (response.tenant) { // ✅ Check if tenant exists
+    if (response.tenant) {
       apiClient.setTenantId(response.tenant.id);
     }
-    // Store user info
+
+    // Store user info (only store tenant if it exists)
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(response.user));
-      localStorage.setItem('tenant', JSON.stringify(response.tenant));
-      
-      // ✅ SET COOKIE
+
+      // Only store tenant if super admin has one
+      if (response.tenant) {
+        localStorage.setItem('tenant', JSON.stringify(response.tenant));
+      }
+
+      // Set user cookie
       document.cookie = `user=${encodeURIComponent(JSON.stringify(response.user))}; path=/; max-age=604800`; // 7 days
     }
 
@@ -29,15 +34,17 @@ export const authAPI = {
     // Store tokens and context
     apiClient.setAccessToken(response.tokens.access_token);
     apiClient.setRefreshToken(response.tokens.refresh_token);
-    // ✅ Add null check:
     if (response.tenant) {
       apiClient.setTenantId(response.tenant.id);
     }
 
-    // Store user info
+    // Store user info (only store tenant if it exists)
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(response.user));
-      localStorage.setItem('tenant', JSON.stringify(response.tenant));
+
+      if (response.tenant) {
+        localStorage.setItem('tenant', JSON.stringify(response.tenant));
+      }
     }
 
     return response;
@@ -50,6 +57,8 @@ export const authAPI = {
       apiClient.clearAuth();
       if (typeof window !== 'undefined') {
         localStorage.clear();
+        // Clear user cookie
+        document.cookie = 'user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       }
     }
   },
@@ -70,5 +79,34 @@ export const authAPI = {
     if (typeof window === 'undefined') return null;
     const tenantStr = localStorage.getItem('tenant');
     return tenantStr ? JSON.parse(tenantStr) : null;
+  },
+
+  // Refresh access token using refresh token
+  refreshToken: async (): Promise<{ access_token: string; refresh_token: string }> => {
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot refresh token on server side');
+    }
+
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    try {
+      const response = await apiClient.post<{ access_token: string; refresh_token: string }>(
+        '/auth/refresh',
+        { refresh_token: refreshToken }
+      );
+
+      // Update tokens in storage
+      apiClient.setAccessToken(response.access_token);
+      apiClient.setRefreshToken(response.refresh_token);
+
+      return response;
+    } catch (error) {
+      // If refresh fails, clear auth and redirect to login
+      apiClient.clearAuth();
+      throw error;
+    }
   }
 };

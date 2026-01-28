@@ -26,5 +26,15 @@ export const branchAPI = {
 
   delete: async (id: string): Promise<void> => {
     return apiClient.delete(`/branches/${id}`);
+  },
+
+  checkLimit: async (): Promise<{
+    can_add: boolean;
+    current_count: number;
+    limit: number;
+    available: number;
+    percentage: number;
+  }> => {
+    return apiClient.get('/tenant-settings/limits/branches');
   }
 };

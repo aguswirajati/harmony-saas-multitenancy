@@ -17,6 +17,8 @@ export interface User {
 export interface UserWithBranch extends User {
   branch_name?: string;
   branch_code?: string;
+  tenant_name?: string;
+  tenant_subdomain?: string;
 }
 
 export interface UserCreate {

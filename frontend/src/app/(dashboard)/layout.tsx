@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
 
 export default function DashboardLayout({
   children,
@@ -35,22 +36,6 @@ export default function DashboardLayout({
     { name: 'Branches', href: '/branches', icon: Building2 },
     { name: 'Users', href: '/users', icon: Users },
     { name: 'Settings', href: '/settings', icon: Settings },
-    // This menu for super admins only
-    { name: 'Organization', href: '/settings/organization', icon: Building2 },
-    { name: 'Subscription', href: '/settings/subscription', icon: Crown },
-    // { name: 'Settings', href: '/settings', icon: Settings,
-    //   children: [
-    //     {
-    //       name: 'Organization',
-    //       href: '/settings/organization',
-    //     },
-    //     {
-    //       name: 'Subscription',
-    //       href: '/settings/subscription',
-    //     },
-    //   ],
-    // },
-
   ];
 
   return (
@@ -141,6 +126,7 @@ export default function DashboardLayout({
       {/* Main content */}
       <div className="lg:pl-64">
         <div className="pt-16 lg:pt-0">
+          <EmailVerificationBanner />
           <main className="p-6">
             {children}
           </main>

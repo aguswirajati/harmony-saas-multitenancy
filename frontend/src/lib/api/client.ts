@@ -55,13 +55,38 @@ class APIClient {
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
           originalRequest._retry = true;
 
-          // Try refresh token (we'll implement this later)
-          // For now, just logout
-          this.clearAuth();
+          try {
+            // Try to refresh the token
+            const refreshToken = this.getRefreshToken();
 
-          // Redirect to login
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+            if (refreshToken) {
+              // Call refresh endpoint directly to avoid circular dependency
+              const response = await axios.post<{ access_token: string; refresh_token: string }>(
+                `${this.baseURL}/auth/refresh`,
+                { refresh_token: refreshToken }
+              );
+
+              // Update tokens
+              this.setAccessToken(response.data.access_token);
+              this.setRefreshToken(response.data.refresh_token);
+
+              // Update the Authorization header with new token
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${response.data.access_token}`;
+              }
+
+              // Retry the original request
+              return this.client(originalRequest);
+            }
+          } catch (refreshError) {
+            // If refresh fails, clear auth and redirect to login
+            this.clearAuth();
+
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+
+            return Promise.reject(refreshError);
           }
         }
 
@@ -122,6 +147,7 @@ class APIClient {
       localStorage.removeItem('tenant_id');
       localStorage.removeItem('branch_id');
       localStorage.removeItem('user');
+      localStorage.removeItem('tenant');
     }
   }
 

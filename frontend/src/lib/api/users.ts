@@ -38,5 +38,36 @@ export const userAPI = {
 
   changePassword: async (id: string, data: UserChangePassword): Promise<void> => {
     return apiClient.post(`/users/${id}/change-password`, data);
+  },
+
+  checkLimit: async (): Promise<{
+    can_add: boolean;
+    current_count: number;
+    limit: number;
+    available: number;
+    percentage: number;
+  }> => {
+    return apiClient.get('/tenant-settings/limits/users');
   }
+};
+
+// Admin API - Super Admin Only
+export const adminUserAPI = {
+  listAll: async (params?: {
+    skip?: number;
+    limit?: number;
+    search?: string;
+    role?: string;
+    tenant_id?: string;
+  }): Promise<UserListResponse> => {
+    const queryParams = new URLSearchParams();
+    if (params?.skip) queryParams.append('skip', params.skip.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.role) queryParams.append('role', params.role);
+    if (params?.tenant_id) queryParams.append('tenant_id', params.tenant_id);
+
+    const url = `/admin/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return apiClient.get<UserListResponse>(url);
+  },
 };

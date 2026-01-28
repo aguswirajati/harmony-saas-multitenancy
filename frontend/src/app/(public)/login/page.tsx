@@ -13,7 +13,8 @@ import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+  const { login, isLoading, error, clearError, isAuthenticated, user, checkAuth } = useAuthStore();
+  const [ready, setReady] = useState(false);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -21,12 +22,25 @@ export default function LoginPage() {
     tenant_subdomain: ''
   });
 
-  // Redirect if already authenticated
+  // Check auth on mount and redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard');
+    checkAuth();
+    const { isAuthenticated: authed, user: u } = useAuthStore.getState();
+    if (authed && u) {
+      const redirectPath = u.role === 'super_admin' ? '/admin' : '/dashboard';
+      router.replace(redirectPath);
+    } else {
+      setReady(true);
     }
-  }, [isAuthenticated, router]);
+  }, [checkAuth, router]);
+
+  // Also redirect if auth state changes (e.g. after login)
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const redirectPath = user.role === 'super_admin' ? '/admin' : '/dashboard';
+      router.push(redirectPath);
+    }
+  }, [isAuthenticated, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +52,11 @@ export default function LoginPage() {
         password: formData.password,
         tenant_subdomain: formData.tenant_subdomain || undefined
       });
-      router.push('/dashboard');
+
+      // Role-based redirect: super_admin → /admin, others → /dashboard
+      const user = useAuthStore.getState().user;
+      const redirectPath = user?.role === 'super_admin' ? '/admin' : '/dashboard';
+      router.push(redirectPath);
     } catch (error) {
       // Error handled by store
       console.error('Login error:', error);
@@ -51,6 +69,10 @@ export default function LoginPage() {
       [e.target.name]: e.target.value
     });
   };
+
+  if (!ready) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -87,7 +109,12 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-blue-600 hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 name="password"

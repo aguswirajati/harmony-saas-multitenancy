@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { branchAPI } from '@/lib/api/branches';
 import { Branch } from '@/types/branch';
 import { Button } from '@/components/ui/button';
@@ -15,11 +16,21 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Edit, Trash2, Building2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Building2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { BranchDialog } from '@/components/features/branches/BranchDialog';
 import { DeleteBranchDialog } from '@/components/features/branches/DeleteBranchDialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import Link from 'next/link';
 
 export default function BranchesPage() {
+  const queryClient = useQueryClient();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -28,6 +39,8 @@ export default function BranchesPage() {
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<{ current_count: number; limit: number } | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
 
   const loadBranches = async () => {
@@ -50,7 +63,17 @@ export default function BranchesPage() {
     loadBranches();
   }, [search]);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    try {
+      const result = await branchAPI.checkLimit();
+      if (!result.can_add) {
+        setLimitInfo({ current_count: result.current_count, limit: result.limit });
+        setLimitDialogOpen(true);
+        return;
+      }
+    } catch {
+      // If limit check fails, allow creating (backend will still enforce)
+    }
     setSelectedBranch(null);
     setDialogOpen(true);
   };
@@ -70,6 +93,7 @@ export default function BranchesPage() {
     setSelectedBranch(null);
     if (success) {
       loadBranches();
+      queryClient.invalidateQueries({ queryKey: ['tenant-usage'] });
     }
   };
 
@@ -78,6 +102,7 @@ export default function BranchesPage() {
     setSelectedBranch(null);
     if (success) {
       loadBranches();
+      queryClient.invalidateQueries({ queryKey: ['tenant-usage'] });
     }
   };
 
@@ -280,6 +305,39 @@ export default function BranchesPage() {
         onClose={handleDeleteDialogClose}
         branch={selectedBranch}
       />
+
+      {/* Limit Reached Dialog */}
+      <Dialog open={limitDialogOpen} onOpenChange={setLimitDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-amber-600" />
+              </div>
+              <div>
+                <DialogTitle>Branch Limit Reached</DialogTitle>
+                <DialogDescription className="mt-1">
+                  You&apos;ve used {limitInfo?.current_count} of {limitInfo?.limit} branches allowed on your current plan.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
+            Upgrade your subscription to add more branches. Visit the Settings page to view available plans.
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setLimitDialogOpen(false)}>
+              Close
+            </Button>
+            <Link href="/settings?tab=subscription">
+              <Button>
+                View Plans
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
