@@ -1,27 +1,85 @@
-# Backend
-backend/venv/
-backend/.env
-backend/__pycache__/
-backend/*.pyc
-backend/.pytest_cache/
-backend/uploads/
+# -------------------------------------------------------------------------
+# GLOBAL IGNORE RULES
+# -------------------------------------------------------------------------
+# Ignore all .env files (Sensitive environment variables)
+.env
+.env.*
+!.env.example # Keep the example file if you have one
 
-# Frontend
-frontend/node_modules/
-frontend/.next/
-frontend/.env.local
-frontend/out/
-frontend/build/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+# Ignore common OS generated files
 .DS_Store
 Thumbs.db
+nul
+
+# Claude Code temp files
+tmpclaude-*
+
+# Python bytecode (global)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Logs
 *.log
+logs/
+backend/logs/
+frontend/logs/
+
+# -------------------------------------------------------------------------
+# FRONTEND (Next.js / Node.js)
+# Located in the 'frontend' directory
+# -------------------------------------------------------------------------
+frontend/node_modules
+frontend/.next/ # Next.js build output
+frontend/out/    # Next.js static export
+frontend/.env.local
+frontend/build/
+frontend/pnpm-lock.yaml
+frontend/yarn-error.log
+
+# Logs and debugging
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+
+# -------------------------------------------------------------------------
+# BACKEND (Python)
+# Located in the 'backend' directory
+# -------------------------------------------------------------------------
+# Byte-compiled / optimized / DLL files
+backend/__pycache__/
+backend/.pytest_cache/
+backend/uploads/
+backend/*.pyc
+backend/*.py[cod]
+backend/.*py[cod]
+backend/~$
+backend/*$
+
+# Virtual environment (Venv)
+backend/venv/
+backend/.venv/
+backend/env/
+backend/.env
+
+# IDE/Editor specific files
+.idea/ # Pycharm
+*.sublime-workspace
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+backend/dist/
+backend/build/
+
+# Database files
+*.sqlite
+*.db
+
+# Database backups
+backups/
+
+# Alembic cache
+backend/alembic/__pycache__/
+backend/alembic/versions/__pycache__/

@@ -175,17 +175,17 @@ Before this project can be considered a production-ready boilerplate:
 - [x] `.env.example` with all variables documented (backend + frontend)
 - [x] Remove all debug scripts, temp files, and duplicate components
 - [x] Remove `console.log` from middleware.ts
-- [ ] Production CORS configuration guide
+- [x] Production CORS configuration guide (`docs/CORS-CONFIGURATION.md`)
 
 ### Should Have
 - [ ] E2E test for critical paths (registration, login, tenant CRUD)
-- [ ] Sentry or equivalent error tracking integration
-- [ ] Database backup/restore scripts
-- [ ] Deployment guide (at least one platform: Docker, Railway, or AWS)
+- [x] Sentry or equivalent error tracking integration (backend + frontend, opt-in via SENTRY_DSN)
+- [x] Database backup/restore scripts (`scripts/backup.sh`, `scripts/restore.sh`)
+- [x] Deployment guide (`docs/DEPLOYMENT.md` — Docker Compose, Railway, manual VPS)
 
 ### Nice to Have
-- [ ] Makefile with common commands
-- [ ] Pre-commit hooks (linting, formatting)
+- [x] Makefile with common commands (`make help` for full list)
+- [x] Pre-commit hooks (`.pre-commit-config.yaml` — ruff, eslint, trailing whitespace, private key detection)
 - [ ] API documentation enrichment (endpoint descriptions in OpenAPI)
 - [ ] Performance benchmarks
 
@@ -309,6 +309,6 @@ Before this project can be considered a production-ready boilerplate:
 | 3 | 2026-01-25 | Audit logging | AuditLog model, audit service, integrated into auth/tenant/user endpoints |
 | 4 | 2026-01-27 | Super admin system | Tenant detail page, subscriptions page, admin sidebar, bug fixes |
 | 5 | 2026-01-28 | Backend testing | 73 tests: tenant isolation, auth (login/register/token), services (tenant/user/branch), authorization |
-| 5b | 2026-01-28 | Infrastructure | Docker (Dockerfiles + compose), CI/CD (GitHub Actions), .env.example updates |
+| 5b | 2026-01-28 | Infrastructure | Docker, CI/CD, .env.example, CORS guide, Sentry, backup scripts, deployment guide, Makefile, pre-commit |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

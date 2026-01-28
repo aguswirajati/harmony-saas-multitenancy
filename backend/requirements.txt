@@ -23,6 +23,9 @@ redis[asyncio]==5.0.1
 # Logging
 loguru==0.7.2
 
+# Monitoring
+sentry-sdk[fastapi]>=1.40.0
+
 # Email
 aiosmtplib==3.0.1
 email-validator>=2.2.0
