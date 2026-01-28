@@ -11,8 +11,12 @@
 Thumbs.db
 nul
 
-# Claude Code temp files
+# Claude Code
 tmpclaude-*
+.claude/
+
+# Python version
+.python-version
 
 # Python bytecode (global)
 __pycache__/
