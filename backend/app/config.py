@@ -37,8 +37,19 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+    def validate_production_settings(self):
+        """Validate critical settings for production deployment."""
+        if not self.DEBUG:
+            if "dev-secret" in self.SECRET_KEY or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "SECRET_KEY is insecure for production. "
+                    "Generate a strong key with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                )
+
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    s.validate_production_settings()
+    return s
 
 settings = get_settings()

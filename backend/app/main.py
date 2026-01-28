@@ -27,10 +27,37 @@ logger.add(
 
 app = FastAPI(
     title=settings.APP_NAME,
+    description="""
+Harmony is an enterprise-grade SaaS multi-tenant API with branch management.
+
+## Authentication
+All authenticated endpoints require a Bearer token in the `Authorization` header.
+Tokens are obtained via `/api/v1/auth/login` or `/api/v1/auth/register`.
+
+## Multi-Tenancy
+- **Super Admins** manage all tenants via `/api/v1/admin/*` endpoints
+- **Tenant Admins** manage their own organization via `/api/v1/users`, `/api/v1/branches`, etc.
+- **Staff** have read access within their tenant
+
+## Rate Limiting
+Auth endpoints are rate-limited. The `X-RateLimit-*` headers indicate current usage.
+""",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    openapi_url="/api/openapi.json",
+    openapi_tags=[
+        {"name": "Authentication", "description": "Login, registration, token refresh, password reset, and email verification"},
+        {"name": "Users", "description": "Tenant user management (scoped to current tenant)"},
+        {"name": "Branches", "description": "Branch/location management within a tenant"},
+        {"name": "Tenants", "description": "Super admin tenant management across the platform"},
+        {"name": "Tenant Settings", "description": "Self-service tenant settings, usage, and limits"},
+        {"name": "Admin - Users", "description": "Super admin cross-tenant user queries"},
+        {"name": "Admin - Stats", "description": "System-wide statistics for super admins"},
+        {"name": "Admin - Tools", "description": "Development and maintenance tools (super admin only)"},
+        {"name": "Admin - Audit", "description": "Audit log viewing and analysis (super admin only)"},
+        {"name": "Health", "description": "Service health check endpoints"},
+    ]
 )
 
 # CORS - must be added first (executed last in middleware stack = outermost layer)
@@ -60,14 +87,14 @@ async def root():
         "docs": "/api/docs"
     }
 
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 async def health_check():
-    """Basic health check endpoint"""
+    """Basic health check endpoint. Returns 200 if the API is running."""
     return {"status": "healthy"}
 
-@app.get("/health/detailed")
+@app.get("/health/detailed", tags=["Health"])
 async def detailed_health_check():
-    """Detailed health check with service status"""
+    """Detailed health check with database and Redis connection status."""
     from app.core.database import SessionLocal
     from app.middleware.rate_limiter import rate_limiter
     import time

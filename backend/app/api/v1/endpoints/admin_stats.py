@@ -10,7 +10,7 @@ from app.models.tenant import Tenant
 from app.models.branch import Branch
 from app.models.audit_log import AuditLog, AuditAction
 
-router = APIRouter(prefix="/admin/stats", tags=["Admin - Statistics"])
+router = APIRouter(prefix="/admin/stats", tags=["Admin - Stats"])
 
 
 @router.get("")

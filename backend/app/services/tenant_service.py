@@ -75,7 +75,17 @@ class TenantService:
     
     def __init__(self, db: Session):
         self.db = db
-    
+
+    @staticmethod
+    def _get_storage_used_gb(tenant_id) -> float:
+        """Calculate storage used by a tenant in GB.
+
+        Returns 0.0 until file upload is implemented (Phase 2+).
+        When file uploads are added, this should query the actual storage
+        usage from the file/upload table or object storage provider.
+        """
+        return 0.0
+
     # ========================================================================
     # CRUD OPERATIONS
     # ========================================================================
@@ -403,7 +413,8 @@ class TenantService:
         # Calculate usage percentages
         users_percent = (user_count / tenant.max_users * 100) if tenant.max_users > 0 else 0
         branches_percent = (branch_count / tenant.max_branches * 100) if tenant.max_branches > 0 else 0
-        storage_percent = 0  # TODO: Implement storage calculation
+        storage_used = self._get_storage_used_gb(tenant_id)
+        storage_percent = (storage_used / tenant.max_storage_gb * 100) if tenant.max_storage_gb > 0 else 0
         
         # Check trial/expiry status
         is_trial = tenant.subscription_status == 'trial'
@@ -430,7 +441,7 @@ class TenantService:
             max_storage_gb=tenant.max_storage_gb,
             user_count=user_count,
             branch_count=branch_count,
-            storage_used_gb=0.0,  # TODO: Implement
+            storage_used_gb=round(storage_used, 2),
             users_usage_percent=round(users_percent, 2),
             branches_usage_percent=round(branches_percent, 2),
             storage_usage_percent=round(storage_percent, 2),
@@ -569,7 +580,7 @@ class TenantService:
             Branch.is_active == True
         ).scalar() or 0
         
-        storage_used = 0.0  # TODO: Implement storage calculation
+        storage_used = self._get_storage_used_gb(tenant_id)
         
         # Calculate available
         users_available = max(0, tenant.max_users - user_count)

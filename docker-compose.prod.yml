@@ -1,0 +1,119 @@
+# Production Docker Compose with nginx reverse proxy
+# Usage: docker compose -f docker-compose.prod.yml up -d
+#
+# Required environment variables (set in .env or export):
+#   DATABASE_URL          - PostgreSQL connection string
+#   SECRET_KEY            - JWT signing key (use a strong random value)
+#   CORS_ORIGINS          - JSON array of allowed origins
+#   FRONTEND_URL          - Public frontend URL
+#   NEXT_PUBLIC_API_URL   - Public API URL (as seen by browser)
+#
+# Optional:
+#   REDIS_URL             - Redis connection (default: redis://redis:6379/0)
+#   MAIL_ENABLED          - Enable email sending (default: False)
+#   MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
+#   SENTRY_DSN            - Sentry error tracking DSN
+
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Uncomment for SSL:
+      # - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    restart: always
+    networks:
+      - harmony
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-harmony}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-harmony_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-harmony}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - harmony
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - harmony
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-harmony}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-harmony_db}}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CORS_ORIGINS: ${CORS_ORIGINS:-'["http://localhost"]'}
+      MAIL_ENABLED: ${MAIL_ENABLED:-False}
+      MAIL_SERVER: ${MAIL_SERVER:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Harmony}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      DEBUG: "False"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: always
+    networks:
+      - harmony
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api}
+    restart: always
+    networks:
+      - harmony
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  harmony:
+    driver: bridge

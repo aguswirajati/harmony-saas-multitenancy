@@ -22,7 +22,7 @@ from app.schemas.audit import (
     AuditStatistics,
 )
 
-router = APIRouter(prefix="/admin/audit-logs", tags=["Audit Logs"])
+router = APIRouter(prefix="/admin/audit-logs", tags=["Admin - Audit"])
 
 
 @router.get("/", response_model=AuditLogListResponse)

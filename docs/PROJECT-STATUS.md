@@ -25,7 +25,7 @@
 | Docker / containerization | Done | Dockerfiles for backend + frontend, docker-compose for local dev |
 | CI/CD | Done | GitHub Actions: backend (lint + test with PostgreSQL), frontend (lint + build) |
 | `.env.example` | Done | Backend + frontend env examples with documentation |
-| Monitoring (Sentry, metrics) | Not started | Health checks exist, but no APM/error tracking |
+| Monitoring (Sentry) | Done | Sentry integration (opt-in via SENTRY_DSN), health checks |
 
 **Overall**: Phase 1 (Critical Foundation) is **100% complete**.
 
@@ -155,12 +155,12 @@
 - [x] ~~`schemas_auth.py` duplicate~~ - Deleted
 - [x] ~~Debug scripts (`check_users.py`, `test_login.py`, etc.)~~ - Deleted (7 files)
 - [x] ~~`nul` Windows artifact~~ - Deleted
-- [ ] Storage-related TODOs in tenant service (storage tracking not implemented)
+- [x] ~~Storage-related TODOs in tenant service~~ - Extracted to `_get_storage_used_gb()` stub method
 
 ### Security
-- [ ] Ensure `SECRET_KEY` is not a placeholder in production
-- [ ] CORS origins should be configured per environment
-- [ ] Rate limiter fails open if Redis is unavailable (by design, but document the risk)
+- [x] ~~Ensure `SECRET_KEY` is not a placeholder in production~~ - Validated at startup (rejects weak keys when DEBUG=False)
+- [x] ~~CORS origins should be configured per environment~~ - Documented in `docs/CORS-CONFIGURATION.md`
+- [x] ~~Rate limiter fails open if Redis is unavailable~~ - Documented in `docs/SECURITY.md` with nginx mitigation
 
 ---
 
@@ -186,7 +186,7 @@ Before this project can be considered a production-ready boilerplate:
 ### Nice to Have
 - [x] Makefile with common commands (`make help` for full list)
 - [x] Pre-commit hooks (`.pre-commit-config.yaml` — ruff, eslint, trailing whitespace, private key detection)
-- [ ] API documentation enrichment (endpoint descriptions in OpenAPI)
+- [x] API documentation enrichment (OpenAPI tags, app description, endpoint summaries)
 - [ ] Performance benchmarks
 
 ---
@@ -199,13 +199,13 @@ Before this project can be considered a production-ready boilerplate:
 - ~~Create `backend/Dockerfile`~~ Done
 - ~~Create `frontend/Dockerfile`~~ Done (multi-stage with standalone output)
 - ~~Create `docker-compose.yml`~~ Done (backend, frontend, postgres, redis)
-- Create `docker-compose.prod.yml` (add nginx reverse proxy) - not started
-- Create `Makefile` for common commands - not started
+- ~~Create `docker-compose.prod.yml`~~ Done (nginx reverse proxy, production settings)
+- ~~Create `Makefile`~~ Done
 
 **CI/CD**
 - ~~`.github/workflows/backend-ci.yml` - lint (ruff), test (pytest with PostgreSQL service)~~ Done
 - ~~`.github/workflows/frontend-ci.yml` - lint (eslint), build (next build)~~ Done
-- `.github/workflows/deploy.yml` - deploy on merge to main - not started
+- ~~`.github/workflows/deploy.yml`~~ Done (builds + pushes images to GHCR on merge to main)
 
 **Monitoring**
 - Add Sentry SDK to backend and frontend
@@ -310,5 +310,6 @@ Before this project can be considered a production-ready boilerplate:
 | 4 | 2026-01-27 | Super admin system | Tenant detail page, subscriptions page, admin sidebar, bug fixes |
 | 5 | 2026-01-28 | Backend testing | 73 tests: tenant isolation, auth (login/register/token), services (tenant/user/branch), authorization |
 | 5b | 2026-01-28 | Infrastructure | Docker, CI/CD, .env.example, CORS guide, Sentry, backup scripts, deployment guide, Makefile, pre-commit |
+| 6 | 2026-01-28 | Finalization | Commit cleanup, docker-compose.prod.yml + nginx, deploy workflow, OpenAPI enrichment, security docs, storage TODO resolution |
 
 Detailed session logs: [`docs/sessions/`](sessions/)
