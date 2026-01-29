@@ -15,9 +15,10 @@ Enterprise-grade multi-tenant SaaS boilerplate with branch management, built wit
 - Automatic token refresh via axios interceptors
 - Password reset flow with email tokens
 - Email verification on registration
-- Redis-based rate limiting (sliding window algorithm)
+- User invitation system (invite via email, accept and set password)
+- Redis-based rate limiting (sliding window algorithm, disable with `DEV_MODE`)
 - Input validation: password strength, SQL injection, XSS prevention
-- Role-based access control (RBAC)
+- Granular permission matrix (RBAC with `require_permission` dependency + `usePermission` hook)
 
 ### Super Admin System
 - Tenant management (create, edit, activate/deactivate, delete)
@@ -31,9 +32,11 @@ Enterprise-grade multi-tenant SaaS boilerplate with branch management, built wit
 ### Tenant Dashboard
 - Organization settings (name, domain, logo)
 - User management with CRUD operations
+- User invitation system (invite, accept, activate)
 - Branch management (HQ + sub-branches)
 - Subscription usage overview
 - Tier limit pre-check dialogs
+- Dark/light theme switcher
 
 ### Infrastructure
 - Comprehensive audit logging (all CRUD, auth events, security events)
@@ -42,6 +45,13 @@ Enterprise-grade multi-tenant SaaS boilerplate with branch management, built wit
 - Request logging with unique request IDs
 - Health check endpoints (`/health`, `/health/detailed`)
 - Error boundaries and custom error pages (404, 500)
+- Developer mode with debug toolbar and rate limit bypass
+- Performance benchmarking script
+
+### Testing
+- **73 backend tests** — tenant isolation, auth flows, service layer (pytest + PostgreSQL)
+- **22 E2E tests** — registration, login, forgot-password, dashboard, navigation (Playwright)
+- CI/CD: GitHub Actions with automated lint, build, and E2E pipelines
 
 ## Tech Stack
 
@@ -102,6 +112,11 @@ npm install
 # Start development server
 npm run dev
 # Opens at http://localhost:3000
+
+# E2E Tests (requires backend running on localhost:8000)
+npx playwright install chromium   # One-time browser install
+npm run test:e2e                  # Run all E2E tests
+npm run test:e2e:ui               # Interactive UI mode
 ```
 
 ### First Steps
@@ -146,6 +161,12 @@ When the backend is running:
 See [docs/PROJECT-STATUS.md](docs/PROJECT-STATUS.md) for detailed status, known issues, and roadmap.
 
 For AI development guidance, see [CLAUDE.md](CLAUDE.md).
+
+## Additional Documentation
+
+- [Permission Matrix](docs/PERMISSIONS.md) - RBAC roles and permissions
+- [Fork Guide](docs/FORK-GUIDE.md) - How to fork for business projects (POS, ERP, etc.)
+- [Performance](docs/PERFORMANCE.md) - Benchmark script and baseline numbers
 
 ## License
 

@@ -16,6 +16,8 @@ from app.schemas.user import (
     UserChangePassword
 )
 from app.services.user_service import UserService
+from app.schemas.invitation import InviteUserRequest, InviteUserResponse
+from app.services.email_service import email_service
 
 router = APIRouter(prefix="/users", tags=["Users"])
 admin_router = APIRouter(prefix="/admin/users", tags=["Admin - Users"])
@@ -183,6 +185,45 @@ async def change_password(
     )
 
     return {"message": "Password changed successfully"}
+
+
+@router.post("/invite", response_model=InviteUserResponse, status_code=status.HTTP_201_CREATED)
+async def invite_user(
+    invite_data: InviteUserRequest,
+    request: Request,
+    current_user: User = Depends(get_admin_user),
+    current_tenant: Tenant = Depends(get_current_tenant),
+    db: Session = Depends(get_db)
+):
+    """
+    Invite a new user to the tenant (Admin only)
+
+    Creates a user with an invitation token and sends an invitation email.
+    The user must accept the invitation to set their password and activate their account.
+    """
+    user_service = UserService(db)
+    user = user_service.invite_user(
+        invite_data=invite_data,
+        tenant_id=current_tenant.id,
+        current_user=current_user,
+        request=request,
+    )
+
+    # Send invitation email (fire-and-forget)
+    inviter_name = current_user.full_name or current_user.email
+    await email_service.send_invitation_email(
+        to_email=user.email,
+        inviter_name=inviter_name,
+        tenant_name=current_tenant.name,
+        invitation_token=user.invitation_token,
+        role=user.role,
+    )
+
+    return InviteUserResponse(
+        message="Invitation sent successfully",
+        email=user.email,
+        role=user.role,
+    )
 
 
 # ============================================================================

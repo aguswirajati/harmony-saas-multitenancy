@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:3001"]
 
+    # Developer mode: disables rate limiting and enables dev tools
+    DEV_MODE: bool = False
+    RATE_LIMIT_ENABLED: bool = True
+
     # Email Configuration
     MAIL_ENABLED: bool = True
     MAIL_FROM: str = "noreply@harmony-saas.com"

@@ -229,7 +229,7 @@ class EmailService:
         Returns:
             bool: True if sent successfully
         """
-        invitation_url = f"{settings.FRONTEND_URL}/accept-invitation?token={invitation_token}"
+        invitation_url = f"{settings.FRONTEND_URL}/accept-invite?token={invitation_token}"
 
         context = {
             "inviter_name": inviter_name,

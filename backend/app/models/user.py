@@ -73,6 +73,11 @@ class User(Base, BaseModel):
     reset_token = Column(String(255), nullable=True)
     reset_token_expires = Column(DateTime(timezone=True), nullable=True)
 
+    # Invitation
+    invitation_token = Column(String(255), nullable=True)
+    invitation_expires_at = Column(DateTime(timezone=True), nullable=True)
+    invited_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
     # Metadata (renamed from metadata to avoid SQLAlchemy conflict)
     meta_data = Column(JSON, default={})
 

@@ -3,6 +3,8 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/components/auth/AuthProvider"
 import { ReactQueryProvider } from "@/components/providers/ReactQueryProvider"
+import { ThemeProvider } from "@/components/theme-provider"
+import { DevToolbar } from "@/components/dev/dev-toolbar"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -17,13 +19,21 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ReactQueryProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
-        </ReactQueryProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ReactQueryProvider>
+            <AuthProvider>
+              {children}
+              <DevToolbar />
+            </AuthProvider>
+          </ReactQueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

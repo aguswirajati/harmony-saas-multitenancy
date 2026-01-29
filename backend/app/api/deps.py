@@ -13,6 +13,7 @@ from app.core.security import decode_token
 from app.models.user import User
 from app.models.tenant import Tenant
 from app.core.exceptions import UnauthorizedException, SuperAdminRequiredException
+from app.core.permissions import Permission, has_permission
 
 security = HTTPBearer()
 
@@ -176,6 +177,27 @@ def verify_tenant_admin(
         )
     
     return current_user
+
+
+def require_permission(permission: Permission):
+    """
+    Factory function to create dependency for checking permissions.
+
+    Usage:
+        @router.post("/", dependencies=[Depends(require_permission(Permission.USERS_CREATE))])
+        async def create_user(...):
+    """
+    def check_permission(
+        current_user: User = Depends(get_current_active_user),
+    ):
+        if not has_permission(current_user.role, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission '{permission.value}' required"
+            )
+        return current_user
+
+    return check_permission
 
 
 # Optional: Dependency for checking feature access

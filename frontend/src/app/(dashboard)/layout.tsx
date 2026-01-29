@@ -11,8 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  Crown
 } from 'lucide-react';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
@@ -39,31 +39,34 @@ export default function DashboardLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md hover:bg-gray-100"
+            className="p-2 rounded-md hover:bg-accent"
           >
             {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           <h1 className="text-lg font-bold">{tenant?.name || 'Dashboard'}</h1>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleLogout}
-        >
-          <LogOut size={18} />
-        </Button>
+        <div className="flex items-center space-x-1">
+          <ThemeToggle />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+          >
+            <LogOut size={18} />
+          </Button>
+        </div>
       </div>
 
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r
+          fixed top-0 left-0 z-40 h-screen w-64 bg-card border-r
           transition-transform duration-300 ease-in-out
           lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -72,10 +75,10 @@ export default function DashboardLayout({
         <div className="flex flex-col h-full">
           {/* Logo/Brand */}
           <div className="p-6 border-b">
-            <h1 className="text-xl font-bold text-gray-900">
+            <h1 className="text-xl font-bold">
               {tenant?.name || 'SaaS App'}
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {tenant?.subdomain}.yourdomain.com
             </p>
           </div>
@@ -86,7 +89,7 @@ export default function DashboardLayout({
               <Link
                 key={item.name}
                 href={item.href}
-                className="flex items-center space-x-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
+                className="flex items-center space-x-3 px-3 py-2 rounded-md text-foreground hover:bg-accent transition-colors"
                 onClick={() => setSidebarOpen(false)}
               >
                 <item.icon size={20} />
@@ -102,13 +105,14 @@ export default function DashboardLayout({
                 {user?.full_name?.charAt(0) || user?.email.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium truncate">
                   {user?.full_name || user?.email}
                 </p>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-xs text-muted-foreground truncate">
                   {user?.role}
                 </p>
               </div>
+              <ThemeToggle />
             </div>
             <Button
               variant="outline"
@@ -136,7 +140,7 @@ export default function DashboardLayout({
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}

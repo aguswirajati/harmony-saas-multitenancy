@@ -12,7 +12,10 @@ from app.schemas.auth import (
     RefreshTokenRequest, RefreshTokenResponse
 )
 from app.schemas.user import UserResponse
+from app.schemas.invitation import AcceptInviteRequest, AcceptInviteResponse
 from app.services.auth_service import AuthService
+from app.services.user_service import UserService
+from app.core.security import create_access_token, create_refresh_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -153,3 +156,47 @@ async def refresh_token(
     """
     auth_service = AuthService(db)
     return auth_service.refresh_token(request)
+
+
+@router.post("/accept-invite", response_model=AcceptInviteResponse)
+async def accept_invite(
+    invite_data: AcceptInviteRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Accept a user invitation
+
+    Sets the user's password and activates their account.
+    Returns authentication tokens so the user is logged in immediately.
+    """
+    user_service = UserService(db)
+    user = user_service.accept_invite(
+        token=invite_data.token,
+        password=invite_data.password,
+        first_name=invite_data.first_name,
+        last_name=invite_data.last_name,
+    )
+
+    # Generate tokens
+    token_data = {
+        "sub": str(user.id),
+        "role": user.role,
+        "tenant_id": str(user.tenant_id) if user.tenant_id else None,
+    }
+    access_token = create_access_token(token_data)
+    refresh_token_val = create_refresh_token(token_data)
+
+    return AcceptInviteResponse(
+        message="Invitation accepted successfully",
+        user={
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+        },
+        tokens={
+            "access_token": access_token,
+            "refresh_token": refresh_token_val,
+            "token_type": "bearer",
+        },
+    )

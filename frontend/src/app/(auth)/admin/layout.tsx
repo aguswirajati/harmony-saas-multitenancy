@@ -16,6 +16,7 @@ import {
   Wrench,
   Crown
 } from 'lucide-react';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -153,6 +154,7 @@ export default function AdminLayout({
                   <span>{user?.role}</span>
                 </p>
               </div>
+              <ThemeToggle className="text-white hover:bg-white/10" />
             </div>
             <Button
               variant="outline"

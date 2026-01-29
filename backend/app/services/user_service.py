@@ -3,13 +3,15 @@ from sqlalchemy import func
 from fastapi import HTTPException, status, Request
 from typing import List, Optional, Tuple
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 
 from app.models.user import User
 from app.models.branch import Branch
 from app.models.tenant import Tenant
 from app.core.security import get_password_hash, verify_password
 from app.schemas.user import UserCreate, UserUpdate, UserChangePassword, UserWithBranch
+from app.schemas.invitation import InviteUserRequest
 from app.services.audit_service import AuditService
 from app.models.audit_log import AuditAction, AuditStatus
 
@@ -318,3 +320,143 @@ class UserService:
         self.db.commit()
 
         return True
+
+    def invite_user(
+        self,
+        invite_data: InviteUserRequest,
+        tenant_id: UUID,
+        current_user: User,
+        request: Request = None
+    ) -> User:
+        """Create an invited user with a pending invitation token."""
+
+        # Check subscription status
+        tenant = self.db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if tenant.subscription_status not in ('active', 'trial'):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your subscription is not active."
+            )
+
+        # Check user limit
+        if tenant.max_users != -1:
+            active_count = self.db.query(func.count(User.id)).filter(
+                User.tenant_id == tenant_id,
+                User.is_active == True
+            ).scalar()
+            if active_count >= tenant.max_users:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"User limit reached ({tenant.max_users}). Upgrade your plan."
+                )
+
+        # Check if email already exists
+        existing = self.db.query(User).filter(
+            User.email == invite_data.email
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+
+        # Validate branch if provided
+        if invite_data.default_branch_id:
+            branch = self.db.query(Branch).filter(
+                Branch.id == invite_data.default_branch_id,
+                Branch.tenant_id == tenant_id
+            ).first()
+            if not branch:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid branch"
+                )
+
+        invitation_token = secrets.token_urlsafe(32)
+
+        # Build full name
+        full_name = None
+        if invite_data.first_name and invite_data.last_name:
+            full_name = f"{invite_data.first_name} {invite_data.last_name}"
+        elif invite_data.first_name:
+            full_name = invite_data.first_name
+
+        user = User(
+            tenant_id=tenant_id,
+            email=invite_data.email,
+            password_hash=get_password_hash(secrets.token_urlsafe(32)),  # temp password
+            first_name=invite_data.first_name,
+            last_name=invite_data.last_name,
+            full_name=full_name,
+            role=invite_data.role,
+            default_branch_id=invite_data.default_branch_id,
+            is_active=False,  # inactive until invitation accepted
+            is_verified=False,
+            invitation_token=invitation_token,
+            invitation_expires_at=datetime.utcnow() + timedelta(days=7),
+            invited_by_id=current_user.id,
+        )
+
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+
+        # Log invitation
+        if request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                action=AuditAction.USER_INVITED,
+                resource="user",
+                resource_id=user.id,
+                details={
+                    "email": user.email,
+                    "role": user.role,
+                    "invited_by": current_user.email,
+                },
+                status=AuditStatus.SUCCESS,
+                request=request,
+            )
+
+        return user
+
+    def accept_invite(self, token: str, password: str, first_name: str = None, last_name: str = None) -> User:
+        """Accept an invitation by setting the password and activating the user."""
+
+        user = self.db.query(User).filter(
+            User.invitation_token == token
+        ).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid invitation token"
+            )
+
+        if user.invitation_expires_at and user.invitation_expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation has expired"
+            )
+
+        user.password_hash = get_password_hash(password)
+        user.is_active = True
+        user.is_verified = True
+        user.invitation_token = None
+        user.invitation_expires_at = None
+        user.email_verified_at = datetime.utcnow()
+
+        if first_name:
+            user.first_name = first_name
+        if last_name:
+            user.last_name = last_name
+        if user.first_name and user.last_name:
+            user.full_name = f"{user.first_name} {user.last_name}"
+        elif user.first_name:
+            user.full_name = user.first_name
+
+        self.db.commit()
+        self.db.refresh(user)
+
+        return user

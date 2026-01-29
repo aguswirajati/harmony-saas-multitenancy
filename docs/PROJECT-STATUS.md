@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-01-28
+> Last updated: 2026-01-29
 
 ---
 
@@ -10,7 +10,7 @@
 | Area | Status | Notes |
 |------|--------|-------|
 | Multi-tenant isolation | Done | tenant_id FK on all resources, enforced at API + service layer |
-| Authentication (9 endpoints) | Done | Register, login, logout, refresh, forgot/reset password, email verify |
+| Authentication (10 endpoints) | Done | Register, login, logout, refresh, forgot/reset password, email verify, accept-invite |
 | Super Admin system (20+ endpoints) | Done | Tenant CRUD, subscriptions, stats, tools, audit logs |
 | Tenant Admin dashboard (4 pages) | Done | Dashboard, users, branches, settings |
 | Rate limiting | Done | Redis-based sliding window, per-endpoint config |
@@ -21,25 +21,30 @@
 | Request logging | Done | Request ID, processing time, structured logging with Loguru |
 | Health checks | Done | `/health` and `/health/detailed` (DB + Redis status) |
 | Tier limit enforcement | Done | User and branch limits checked on creation |
-| Testing | Done | 73 tests passing (tenant isolation, auth, services, authorization) |
+| Testing | Done | 73 backend tests + 20 Playwright E2E tests passing (auth, dashboard, navigation) |
 | Docker / containerization | Done | Dockerfiles for backend + frontend, docker-compose for local dev |
-| CI/CD | Done | GitHub Actions: backend (lint + test with PostgreSQL), frontend (lint + build) |
+| CI/CD | Done | GitHub Actions: backend (lint + test with PostgreSQL), frontend (lint + build + E2E with Playwright) |
 | `.env.example` | Done | Backend + frontend env examples with documentation |
 | Monitoring (Sentry) | Done | Sentry integration (opt-in via SENTRY_DSN), health checks |
+| Theme switcher | Done | Dark/light mode with next-themes, toggle in sidebar |
+| Permission matrix | Done | RBAC with Permission enum, `require_permission` dependency, `usePermission` hook |
+| Developer mode | Done | `DEV_MODE`/`RATE_LIMIT_ENABLED` env vars, dev toolbar in frontend |
+| User invitations | Done | Invite endpoint, accept-invite flow, email integration, 7-day token expiry |
+| Performance benchmarks | Done | `scripts/benchmark.py` with httpx, `docs/PERFORMANCE.md` |
 
-**Overall**: Phase 1 (Critical Foundation) is **100% complete**.
+**Overall**: Phase 1 (Critical Foundation) is **100% complete**. Boilerplate finalization features added.
 
 ---
 
 ## 2. What's Implemented
 
-### Backend: 40+ API Endpoints across 8 Routers
+### Backend: 49 API Endpoints across 8 Routers
 
 | Router | Prefix | Endpoints | Auth Required |
 |--------|--------|-----------|---------------|
-| auth | `/api/v1/auth` | 9 (register, login, logout, me, forgot-password, reset-password, verify-email, resend-verification, refresh) | Varies |
+| auth | `/api/v1/auth` | 10 (register, login, logout, me, forgot-password, reset-password, verify-email, resend-verification, refresh, accept-invite) | Varies |
 | tenants (admin) | `/api/v1/admin/tenants` | 12 (CRUD, subscription mgmt, feature flags, status, stats, users list) | Super Admin |
-| users | `/api/v1/users` | 6 (list, get, create, update, delete, me) | Tenant Admin/Staff |
+| users | `/api/v1/users` | 7 (list, get, create, update, delete, change-password, invite) | Tenant Admin/Staff |
 | users (admin) | `/api/v1/admin/users` | 1 (cross-tenant listing) | Super Admin |
 | branches | `/api/v1/branches` | 5 (list, get, create, update, delete) | Tenant Admin/Staff |
 | tenant-settings | `/api/v1/tenant` | 7 (self-service: get/update tenant, subscription view, usage, features) | Tenant Admin |
@@ -51,7 +56,7 @@
 
 | Model | Table | Key Fields |
 |-------|-------|------------|
-| User | `users` | email, role, tenant_id, is_super_admin, verification/reset tokens |
+| User | `users` | email, role, tenant_id, is_super_admin, verification/reset/invitation tokens |
 | Tenant | `tenants` | name, subdomain, subscription_tier, max_users, max_branches, features (JSON) |
 | Branch | `branches` | name, code, tenant_id, is_headquarters |
 | AuditLog | `audit_logs` | user_id, tenant_id, action, resource, details (JSON), ip_address, request_id |
@@ -63,7 +68,7 @@
 |---------|---------|
 | AuthService | Registration, login, token refresh, password reset, email verification |
 | TenantService | Tenant CRUD, subscription management, system stats, tier configs |
-| UserService | User CRUD within tenant, role management, tier limit checks |
+| UserService | User CRUD within tenant, role management, tier limit checks, user invitation |
 | BranchService | Branch CRUD within tenant, HQ management, tier limit checks |
 | AuditService | Log actions, query audit trail, security event tracking |
 | EmailService | SMTP sending, Jinja2 template rendering (welcome, reset, verify, invite) |
@@ -87,9 +92,9 @@
 | SQLInjectionValidator | Detects SQL keywords, comments, injection patterns |
 | XSSValidator | Detects script tags, javascript: protocol, event handlers |
 
-### Frontend: 20 Pages
+### Frontend: 21 Pages
 
-**Public (5 pages)**:
+**Public (6 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/login` | Login with role-based redirect |
@@ -97,6 +102,7 @@
 | `/forgot-password` | Request password reset email |
 | `/reset-password` | Set new password with token |
 | `/verify-email` | Verify email with token |
+| `/accept-invite` | Accept user invitation and set password |
 
 **Dashboard - Tenant Users (4 pages)**:
 | Route | Purpose |
@@ -123,6 +129,9 @@
 
 ### Frontend: Key Components
 
+- **ThemeProvider** - next-themes dark/light mode provider
+- **ThemeToggle** - Dark/light mode toggle button
+- **DevToolbar** - Development-only toolbar showing user role, tenant info
 - **ErrorBoundary** - React class component for graceful error catching
 - **EmailVerificationBanner** - Banner for unverified users
 - **CreateTenantForm** - Multi-field tenant creation form
@@ -139,6 +148,7 @@
 | `5c5b21b248cf` | Add super admin support |
 | `ac0eec46e937` | Add email verification and password reset tokens |
 | `a53b92ec41a0` | Add audit logs table |
+| `b7f2a1c3d4e5` | Add user invitation fields (token, expiry, invited_by) |
 
 ---
 
@@ -178,7 +188,7 @@ Before this project can be considered a production-ready boilerplate:
 - [x] Production CORS configuration guide (`docs/CORS-CONFIGURATION.md`)
 
 ### Should Have
-- [ ] E2E test for critical paths (registration, login, tenant CRUD)
+- [x] E2E test for critical paths (registration, login, tenant CRUD)
 - [x] Sentry or equivalent error tracking integration (backend + frontend, opt-in via SENTRY_DSN)
 - [x] Database backup/restore scripts (`scripts/backup.sh`, `scripts/restore.sh`)
 - [x] Deployment guide (`docs/DEPLOYMENT.md` — Docker Compose, Railway, manual VPS)
@@ -187,7 +197,7 @@ Before this project can be considered a production-ready boilerplate:
 - [x] Makefile with common commands (`make help` for full list)
 - [x] Pre-commit hooks (`.pre-commit-config.yaml` — ruff, eslint, trailing whitespace, private key detection)
 - [x] API documentation enrichment (OpenAPI tags, app description, endpoint summaries)
-- [ ] Performance benchmarks
+- [x] Performance benchmarks (`scripts/benchmark.py`, `docs/PERFORMANCE.md`)
 
 ---
 
@@ -204,13 +214,13 @@ Before this project can be considered a production-ready boilerplate:
 
 **CI/CD**
 - ~~`.github/workflows/backend-ci.yml` - lint (ruff), test (pytest with PostgreSQL service)~~ Done
-- ~~`.github/workflows/frontend-ci.yml` - lint (eslint), build (next build)~~ Done
+- ~~`.github/workflows/frontend-ci.yml` - lint (eslint), build (next build), E2E (Playwright)~~ Done
 - ~~`.github/workflows/deploy.yml`~~ Done (builds + pushes images to GHCR on merge to main)
 
 **Monitoring**
-- Add Sentry SDK to backend and frontend
+- ~~Add Sentry SDK to backend and frontend~~ Done (opt-in via SENTRY_DSN)
 - Add `/metrics` endpoint (Prometheus format)
-- Create database backup scripts
+- ~~Create database backup scripts~~ Done (`scripts/backup.sh`, `scripts/restore.sh`)
 
 ### Features
 
@@ -227,11 +237,11 @@ Before this project can be considered a production-ready boilerplate:
 - Document attachments
 - Storage quota tracking per tenant (model field exists, logic TODO)
 
-**Theme Switcher**
-- Dark/light mode toggle
-- Store preference in localStorage + user profile
-- CSS variables or Tailwind dark mode classes
-- Per-tenant branding colors (optional)
+**Theme Switcher** (Done)
+- ~~Dark/light mode toggle~~ Done (ThemeToggle component in sidebar)
+- ~~Store preference in localStorage~~ Done (next-themes)
+- ~~CSS variables or Tailwind dark mode classes~~ Done (both)
+- Per-tenant branding colors (optional, deferred)
 
 **Internationalization (i18n)**
 - Support for English and Bahasa Indonesia
@@ -247,11 +257,11 @@ Before this project can be considered a production-ready boilerplate:
 - Usage-based billing support
 - Trial period management
 
-**User Invitations**
-- Admin sends invite email to new user
-- Invite link → accept page → set password → auto-login
-- Invitation tracking and expiry
-- Bulk invite support
+**User Invitations** (Done)
+- ~~Admin sends invite email to new user~~ Done (`POST /api/v1/users/invite`)
+- ~~Invite link → accept page → set password → auto-login~~ Done (`/accept-invite` page + `POST /api/v1/auth/accept-invite`)
+- ~~Invitation tracking and expiry~~ Done (7-day token expiry)
+- Bulk invite support (deferred)
 
 **Analytics & Reporting**
 - Tenant usage analytics (active users, API calls, storage)
@@ -264,7 +274,7 @@ Before this project can be considered a production-ready boilerplate:
 **Testing**
 - Backend: ~~pytest + pytest-asyncio, test factories~~ Done (73 tests, PostgreSQL, savepoint rollback)
 - Frontend: Jest + React Testing Library for components (not started)
-- E2E: Playwright for critical user flows (not started)
+- E2E: ~~Playwright for critical user flows~~ Done (5 spec files: registration, login, forgot-password, dashboard, navigation)
 - ~~Tenant isolation security tests~~ Done (10 tests covering cross-tenant user/branch access)
 
 **Security Audit**
@@ -311,5 +321,7 @@ Before this project can be considered a production-ready boilerplate:
 | 5 | 2026-01-28 | Backend testing | 73 tests: tenant isolation, auth (login/register/token), services (tenant/user/branch), authorization |
 | 5b | 2026-01-28 | Infrastructure | Docker, CI/CD, .env.example, CORS guide, Sentry, backup scripts, deployment guide, Makefile, pre-commit |
 | 6 | 2026-01-28 | Finalization | Commit cleanup, docker-compose.prod.yml + nginx, deploy workflow, OpenAPI enrichment, security docs, storage TODO resolution |
+| 7 | 2026-01-28 | E2E Testing | Playwright setup, 22 E2E tests (5 spec files: registration, login, forgot-password, dashboard, navigation), CI integration with PostgreSQL + Redis + backend |
+| 8 | 2026-01-29 | Boilerplate finalization | Theme switcher (dark/light), permission matrix (RBAC), dev mode tools, user invitation system, performance benchmarks, fork guide |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

@@ -4,7 +4,8 @@
 # Ignore all .env files (Sensitive environment variables)
 .env
 .env.*
-!.env.example # Keep the example file if you have one
+# Keep the example files
+!.env.example
 
 # Ignore common OS generated files
 .DS_Store
@@ -45,6 +46,12 @@ frontend/yarn-error.log
 # Logs and debugging
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/playwright/.cache/
+frontend/blob-report/
 
 # -------------------------------------------------------------------------
 # BACKEND (Python)

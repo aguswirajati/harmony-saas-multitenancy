@@ -166,6 +166,9 @@ async def rate_limit_dependency(
     Raises:
         HTTPException: If rate limit exceeded (429 Too Many Requests)
     """
+    if not settings.RATE_LIMIT_ENABLED or settings.DEV_MODE:
+        return
+
     key = create_rate_limit_key(request, prefix)
     is_allowed, info = await rate_limiter.check_rate_limit(
         key, max_requests, window_seconds

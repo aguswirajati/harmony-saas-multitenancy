@@ -7,17 +7,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 1 (Critical Foundation): 100% complete.**
 
 What's built:
-- 40+ API endpoints across 8 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats)
-- 20 frontend pages (5 public, 4 dashboard, 11 admin)
+- 49 API endpoints across 8 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats)
+- 21 frontend pages (6 public, 4 dashboard, 11 admin)
 - 5 models (User, Tenant, Branch, AuditLog, BaseModel)
 - 6 services (Auth, Tenant, User, Branch, Audit, Email)
 - 3 middleware (rate limiter, error handler, request logger)
 - 6 input validators (password, subdomain, email, name, SQL injection, XSS)
+- Permission matrix (RBAC with `require_permission` dependency + `usePermission` hook)
+- Dark/light theme switcher (next-themes)
+- User invitation system (invite + accept-invite flow)
+- Developer mode tools (DEV_MODE flag, dev toolbar)
+- Performance benchmark script
 - 73 backend tests (tenant isolation, auth, services, authorization) - all passing
+- 20 Playwright E2E tests passing + 2 fixme (registration, login, dashboard, navigation)
 - Docker setup (Dockerfiles + docker-compose for local dev)
-- CI/CD (GitHub Actions for backend lint/test, frontend lint/build)
+- CI/CD (GitHub Actions for backend lint/test, frontend lint/build/e2e)
 
-What's NOT built yet (Phase 2+): monitoring, notifications, file upload, i18n, billing integration.
+What's NOT built yet (Phase 2+): notifications, file upload, i18n, billing integration.
 
 For full status details, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
 
@@ -66,6 +72,8 @@ python scripts/seed_data.py
 - `DATABASE_URL` - PostgreSQL connection string
 - `SECRET_KEY` - JWT signing key
 - `REDIS_URL` - Redis connection (optional, defaults to localhost:6379)
+- `DEV_MODE` - Set `true` to disable rate limiting and enable dev tools (default: `false`)
+- `RATE_LIMIT_ENABLED` - Explicitly disable rate limiting (default: `true`)
 
 ### Frontend (Next.js)
 
@@ -85,6 +93,15 @@ npm run start                          # Runs production server
 
 # Linting
 npm run lint                           # Run ESLint
+
+# E2E Tests (requires backend running on localhost:8000)
+npx playwright install chromium        # One-time: install browser
+npm run test:e2e                       # Run all E2E tests
+npm run test:e2e:ui                    # Run with interactive UI
+npx playwright test e2e/auth/          # Run auth tests only
+npx playwright test e2e/dashboard/     # Run dashboard tests only
+npx playwright test --headed           # Run with visible browser
+npx playwright show-report             # View HTML test report
 ```
 
 ### Docker
@@ -114,7 +131,7 @@ docker compose down -v
 
 GitHub Actions workflows run automatically on push/PR to `main`:
 - **`backend-ci.yml`**: Lint (ruff) + test (pytest with PostgreSQL service container)
-- **`frontend-ci.yml`**: Lint (ESLint) + build (next build)
+- **`frontend-ci.yml`**: Lint (ESLint) + build (next build) + E2E tests (Playwright with PostgreSQL + Redis + backend)
 
 ## Architecture Overview
 
@@ -187,7 +204,27 @@ API Endpoints (backend/app/api/v1/endpoints/)
    - Returns new access token and refresh token
    - Frontend automatically refreshes tokens before expiry using axios interceptors
 
+### Permission System
+
+**Backend** (`backend/app/core/permissions.py`):
+- `Permission` enum with granular actions (e.g., `users.create`, `branches.delete`)
+- `ROLE_PERMISSIONS` dict maps roles to permission sets
+- `require_permission(permission)` FastAPI dependency for endpoint protection
+- See `docs/PERMISSIONS.md` for the full matrix
+
+**Frontend** (`frontend/src/hooks/use-permission.ts`):
+- `usePermission(permission)` - returns boolean for single permission check
+- `usePermissions(...permissions)` - returns boolean array for multiple checks
+- Mirrors backend ROLE_PERMISSIONS for client-side UI gating
+
 ### Authentication Features
+
+**User Invitation Flow**:
+1. Admin invites user via `POST /api/v1/users/invite` (email, role, optional branch)
+2. System creates inactive user with invitation token (7-day expiry)
+3. Invitation email sent with link to `/accept-invite?token=...`
+4. User sets password and optional name on accept-invite page
+5. `POST /api/v1/auth/accept-invite` activates user and returns auth tokens
 
 **Password Reset Flow**:
 1. User requests password reset at `/forgot-password`
@@ -209,6 +246,7 @@ API Endpoints (backend/app/api/v1/endpoints/)
 - `/forgot-password` - Request password reset
 - `/reset-password` - Set new password with token
 - `/verify-email` - Verify email with token
+- `/accept-invite` - Accept user invitation and set password
 
 ### Dependency Injection Pattern
 
@@ -265,7 +303,7 @@ db.query(User).filter(User.is_active == True)
 - Logout on refresh token failure
 
 **Route Protection** (`middleware.ts`):
-- Public routes: `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`
+- Public routes: `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`, `/accept-invite`
 - Super admin users: Forced redirect to `/admin/*`
 - Regular users: Cannot access `/admin/*`, redirect to `/dashboard`
 - Unauthenticated: Redirect to `/login`
@@ -347,6 +385,7 @@ Registered in `backend/app/main.py`, execution order:
    - Redis-based sliding window algorithm
    - Applied per-endpoint via dependency injection
    - Presets: `auth_rate_limit` (5/15min), `strict_rate_limit` (3/hr), `api_rate_limit` (100/min)
+   - Disabled when `DEV_MODE=true` or `RATE_LIMIT_ENABLED=false`
    - Fails open if Redis unavailable (logs warning)
 
 4. **Error Handler** (`backend/app/middleware/error_handler.py`):
@@ -493,6 +532,7 @@ if current_user_count >= tenant.max_users:
 | `backend/app/services/tenant_service.py` | Tenant CRUD, subscription management, system stats |
 | `backend/app/services/audit_service.py` | Audit trail logging and querying |
 | `backend/app/services/email_service.py` | SMTP email sending with Jinja2 templates |
+| `backend/app/core/permissions.py` | Permission enum and ROLE_PERMISSIONS mapping |
 | `backend/app/middleware/rate_limiter.py` | Redis-based rate limiting |
 | `backend/app/middleware/error_handler.py` | Global exception handler |
 | `backend/app/middleware/logging.py` | Request logging with request ID |
@@ -500,11 +540,18 @@ if current_user_count >= tenant.max_users:
 | `frontend/src/lib/api/client.ts` | Axios client with auth interceptors & token refresh |
 | `frontend/src/lib/api/auth.ts` | Auth API calls (login, register, refresh, password reset) |
 | `frontend/src/lib/store/authStore.ts` | Zustand auth state store |
+| `frontend/src/hooks/use-permission.ts` | Frontend permission checking hook |
+| `frontend/src/components/theme-provider.tsx` | next-themes dark/light mode provider |
+| `frontend/src/components/dev/dev-toolbar.tsx` | Development-only debug toolbar |
 | `frontend/middleware.ts` | **Critical**: Route protection & role-based redirects |
 | `frontend/src/components/ErrorBoundary.tsx` | React error boundary for graceful error handling |
 | `frontend/src/components/EmailVerificationBanner.tsx` | Email verification reminder banner |
 | `backend/tests/conftest.py` | **Critical**: Test fixtures, factories, DB session setup |
 | `backend/tests/test_tenant_isolation/test_isolation.py` | **Security**: Cross-tenant data access tests |
+| `frontend/playwright.config.ts` | Playwright E2E test configuration |
+| `frontend/e2e/helpers/auth.ts` | E2E test helpers (register, login, token injection) |
+| `frontend/e2e/auth/` | E2E tests for registration, login, forgot-password |
+| `frontend/e2e/dashboard/` | E2E tests for dashboard content and navigation |
 
 ## Common Gotchas
 
@@ -518,19 +565,24 @@ if current_user_count >= tenant.max_users:
 8. **Email service**: Password reset and email verification require email service configuration (SendGrid/AWS SES)
 9. **Error boundaries**: Wrap async components in ErrorBoundary for graceful error handling
 10. **Public routes**: Update `middleware.ts` when adding new public authentication routes
+11. **Permissions**: Keep `ROLE_PERMISSIONS` in sync between backend (`core/permissions.py`) and frontend (`hooks/use-permission.ts`)
+12. **Dev mode**: Set `DEV_MODE=true` in `.env` to disable rate limiting and show dev toolbar
+13. **Invitation tokens**: Expire after 7 days; invited users are inactive until they accept
 
 ## Testing Infrastructure
 
+### Backend Tests
+
 **73 tests, all passing** against PostgreSQL. Uses transaction rollback per test (savepoint pattern) for speed and isolation.
 
-### Test Database Setup
+#### Test Database Setup
 ```bash
 # One-time: create test database
 createdb harmony_test
 # Or set TEST_DATABASE_URL env var for custom connection string
 ```
 
-### Test Structure
+#### Test Structure
 ```
 backend/tests/
 ├── conftest.py                          # Core fixtures, factories, autouse mocks
@@ -547,7 +599,7 @@ backend/tests/
     └── test_branch_service.py           # Branch CRUD, HQ protection, tier limits
 ```
 
-### Key Test Fixtures (`conftest.py`)
+#### Key Test Fixtures (`conftest.py`)
 - `db_session` — per-test transactional session with savepoint rollback
 - `client` — FastAPI `TestClient` with DB override
 - `create_tenant()`, `create_branch()`, `create_user()` — factory callables
@@ -558,11 +610,60 @@ backend/tests/
 - `mock_email_service` (autouse) — prevents SMTP calls
 - `disable_rate_limiting` (autouse) — bypasses Redis rate limits
 
-### Adding New Tests
+#### Adding New Backend Tests
 1. Use factory fixtures to create test data
 2. Always test tenant isolation for new resource types
 3. Test both happy path and error cases (401, 403, 404)
 4. Service tests use `db_session` directly; API tests use `client`
+
+### E2E Tests (Playwright)
+
+**22 tests across 5 spec files**, running against a live frontend + backend (Chromium).
+
+#### Prerequisites
+- Backend running on `localhost:8000` (with PostgreSQL + Redis)
+- Chromium installed: `cd frontend && npx playwright install chromium`
+
+#### Running E2E Tests
+```bash
+cd frontend
+npm run test:e2e          # Run all E2E tests (auto-starts Next.js dev server)
+npm run test:e2e:ui       # Interactive UI mode
+npx playwright test --headed  # Visible browser
+```
+
+#### E2E Test Structure
+```
+frontend/e2e/
+├── helpers/
+│   └── auth.ts                          # Test helpers: registerTestTenant, loginViaUI, setAuthTokens
+├── auth/
+│   ├── registration.spec.ts             # 3 tests: register, duplicate subdomain, login link
+│   ├── login.spec.ts                    # 6 tests: success, wrong password, bad email, logout, nav links
+│   └── forgot-password.spec.ts          # 2 tests: submit email, back-to-login link
+└── dashboard/
+    ├── dashboard.spec.ts                # 5 tests: welcome, stats, org info, quick actions, account info
+    └── navigation.spec.ts               # 6 tests: page access, admin redirect, sidebar links
+```
+
+#### E2E Test Helpers (`e2e/helpers/auth.ts`)
+- `registerTestTenant()` — registers a new tenant via API, returns credentials + tokens
+- `loginViaUI(page, email, password)` — fills and submits the login form
+- `setAuthTokens(page, tenant)` — injects auth tokens into localStorage (skips login UI for speed)
+
+#### Adding New E2E Tests
+1. Create spec files in `frontend/e2e/` under a descriptive subdirectory
+2. Use `registerTestTenant()` to create isolated test data per test/suite
+3. Use `setAuthTokens()` for tests that don't need to exercise the login flow
+4. Use unique timestamps in test data to avoid collisions between parallel runs
+5. Assert on visible text and semantic roles, not CSS classes or internal IDs
+
+#### E2E Configuration (`frontend/playwright.config.ts`)
+- `baseURL`: `http://localhost:3000` (override with `E2E_BASE_URL` env var)
+- `webServer`: auto-starts `npm run dev` (reuses existing server locally)
+- Projects: Chromium only (expand later)
+- CI: retries 2x, single worker, HTML reporter
+- Traces captured on first retry; screenshots on failure
 
 ## API Documentation
 
