@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 What's built:
 - 49 API endpoints across 8 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats)
 - 21 frontend pages (6 public, 4 dashboard, 11 admin)
-- 5 models (User, Tenant, Branch, AuditLog, BaseModel)
+- 5 models (User, Tenant, Branch, AuditLog) + BaseModel and TenantScopedModel abstract bases
 - 6 services (Auth, Tenant, User, Branch, Audit, Email)
 - 3 middleware (rate limiter, error handler, request logger)
 - 6 input validators (password, subdomain, email, name, SQL injection, XSS)
@@ -276,17 +276,38 @@ async def list_branches(
 All models inherit from `BaseModel` with:
 - `is_active: bool = True`
 - `deleted_at: datetime | None = None`
+- `created_by_id: UUID | None` — who created the record
+- `updated_by_id: UUID | None` — who last updated the record
+- `deleted_by_id: UUID | None` — who soft-deleted the record
 
 Never hard delete records. Instead:
 ```python
 # Mark as deleted
 obj.is_active = False
 obj.deleted_at = datetime.utcnow()
+obj.deleted_by_id = current_user.id
 db.commit()
 
 # Filter active records
 db.query(User).filter(User.is_active == True)
 ```
+
+### TenantScopedModel
+
+For domain models that belong to a tenant, inherit from `TenantScopedModel` instead of `BaseModel`:
+
+```python
+from app.models.base import TenantScopedModel
+
+class Item(Base, TenantScopedModel):
+    __tablename__ = "items"
+    name = Column(String, nullable=False)
+    # tenant_id and branch_id are inherited automatically
+```
+
+`TenantScopedModel` extends `BaseModel` and adds:
+- `tenant_id` (required, CASCADE delete) — links to `tenants` table
+- `branch_id` (optional, SET NULL) — links to `branches` table for branch-level scoping
 
 ### Frontend Architecture
 
@@ -451,27 +472,27 @@ async def create_item(
 
 ### When Adding Database Models
 
-1. **Inherit from BaseModel** to get common fields (`id`, `created_at`, `updated_at`, `deleted_at`, `is_active`)
-2. **Add `tenant_id` foreign key** with CASCADE delete (unless it's a tenant-independent model)
+1. **Inherit from `TenantScopedModel`** for tenant-scoped models (gets `id`, `created_at`, `updated_at`, `deleted_at`, `is_active`, `created_by_id`, `updated_by_id`, `deleted_by_id`, `tenant_id`, `branch_id`)
+2. **Inherit from `BaseModel`** only for tenant-independent models (e.g., system-level tables)
 3. **Create migration**: `alembic revision --autogenerate -m "add_item_model"`
 4. **Review migration file** before applying
 5. **Apply migration**: `alembic upgrade head`
 
-Example:
+Example (tenant-scoped):
 ```python
 # models/item.py
-from app.models.base import BaseModel
-from sqlalchemy import Column, String, ForeignKey, UUID
+from app.models.base import TenantScopedModel
+from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
+from app.core.database import Base
 
-class Item(BaseModel):
+class Item(Base, TenantScopedModel):
     __tablename__ = "items"
 
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(String)
 
-    # Relationships
+    # tenant_id, branch_id inherited from TenantScopedModel
     tenant = relationship("Tenant", back_populates="items")
 ```
 

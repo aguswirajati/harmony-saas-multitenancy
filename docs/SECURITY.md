@@ -83,10 +83,11 @@ Data isolation is enforced at multiple layers:
 
 ## Soft Delete Considerations
 
-All records use soft delete (`is_active=False`, `deleted_at` timestamp). This means:
+All records use soft delete (`is_active=False`, `deleted_at` timestamp). Additionally, `BaseModel` includes `created_by_id`, `updated_by_id`, and `deleted_by_id` fields for audit tracking (who performed each action). This means:
 
 - Deleted user emails remain in the database (relevant for uniqueness constraints)
 - Audit logs reference soft-deleted users/tenants (by design, for compliance)
+- `deleted_by_id` records which user performed the soft delete for accountability
 - Ensure all queries filter `is_active == True` to avoid exposing deleted records
 - Database backups contain soft-deleted data
 

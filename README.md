@@ -40,6 +40,8 @@ Enterprise-grade multi-tenant SaaS boilerplate with branch management, built wit
 
 ### Infrastructure
 - Comprehensive audit logging (all CRUD, auth events, security events)
+- Audit user tracking (`created_by_id`, `updated_by_id`, `deleted_by_id` on all models)
+- `TenantScopedModel` abstract base class for tenant-isolated domain models
 - Email service with responsive HTML templates (welcome, reset, verify, invite)
 - Global error handling with standardized responses
 - Request logging with unique request IDs

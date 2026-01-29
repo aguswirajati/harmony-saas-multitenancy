@@ -52,15 +52,16 @@
 | admin-tools | `/api/v1/admin/tools` | 2 (seed data, reset DB) | Super Admin |
 | admin-stats | `/api/v1/admin/stats` | 1 (system-wide statistics) | Super Admin |
 
-### Backend: Models (5)
+### Backend: Models (4 concrete + 2 abstract bases)
 
 | Model | Table | Key Fields |
 |-------|-------|------------|
 | User | `users` | email, role, tenant_id, is_super_admin, verification/reset/invitation tokens |
-| Tenant | `tenants` | name, subdomain, subscription_tier, max_users, max_branches, features (JSON) |
+| Tenant | `tenants` | name, code, subdomain, subscription_tier, max_users, max_branches, features (JSON) |
 | Branch | `branches` | name, code, tenant_id, is_headquarters |
 | AuditLog | `audit_logs` | user_id, tenant_id, action, resource, details (JSON), ip_address, request_id |
-| BaseModel | (abstract) | id (UUID), created_at, updated_at, deleted_at, is_active |
+| BaseModel | (abstract) | id (UUID), created_at, updated_at, deleted_at, is_active, created_by_id, updated_by_id, deleted_by_id |
+| TenantScopedModel | (abstract) | Inherits BaseModel + tenant_id (CASCADE), branch_id (SET NULL) |
 
 ### Backend: Services (6)
 
@@ -149,6 +150,7 @@
 | `ac0eec46e937` | Add email verification and password reset tokens |
 | `a53b92ec41a0` | Add audit logs table |
 | `b7f2a1c3d4e5` | Add user invitation fields (token, expiry, invited_by) |
+| `73458efe5641` | Add audit tracking (created/updated/deleted_by_id), tenant code, TenantScopedModel base |
 
 ---
 
@@ -323,5 +325,6 @@ Before this project can be considered a production-ready boilerplate:
 | 6 | 2026-01-28 | Finalization | Commit cleanup, docker-compose.prod.yml + nginx, deploy workflow, OpenAPI enrichment, security docs, storage TODO resolution |
 | 7 | 2026-01-28 | E2E Testing | Playwright setup, 22 E2E tests (5 spec files: registration, login, forgot-password, dashboard, navigation), CI integration with PostgreSQL + Redis + backend |
 | 8 | 2026-01-29 | Boilerplate finalization | Theme switcher (dark/light), permission matrix (RBAC), dev mode tools, user invitation system, performance benchmarks, fork guide |
+| 9 | 2026-01-29 | ERP foundation | Audit user tracking (created/updated/deleted_by_id on BaseModel), TenantScopedModel abstract base, tenant code column, health check text() fix |
 
 Detailed session logs: [`docs/sessions/`](sessions/)
