@@ -9,6 +9,7 @@ class Tenant(Base, BaseModel):
 
     # Basic info
     name = Column(String(255), nullable=False)
+    code = Column(String(50), unique=True, nullable=True, index=True)
     subdomain = Column(String(100), unique=True, nullable=False, index=True)
     domain = Column(String(255), unique=True, nullable=True)
 
