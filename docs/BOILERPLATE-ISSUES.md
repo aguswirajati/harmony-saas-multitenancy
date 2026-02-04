@@ -79,158 +79,9 @@ TASK: Make audit endpoints permission-based instead of role-hardcoded.
 
 ---
 
-### ISSUE-003: Enhanced Developer Tools
+### ~~ISSUE-003: Enhanced Developer Tools~~ → RESOLVED
 
-**Classification:** Boilerplate
-**Severity:** Medium
-**Status:** OPEN
-**Date identified:** 2026-01-30
-
-**Problem:**
-Developer tooling is minimal. The `/admin/tools` page only has seed and reset buttons. There is no runtime toggle for DEV_MODE, no log level control, no system info panel, and no way to clear audit logs for fresh testing. The dev toolbar (bottom bar) only shows auth state info.
-
-**Current state:**
-- `/admin/tools` — Seed data + reset database (2 buttons)
-- `/admin/logs` — Page missing (ISSUE-001), but once built it needs a clear/archive action
-- `DEV_MODE` — Env var only, requires server restart to change
-- Log level — Hardcoded to INFO in `main.py`, no runtime control
-- Dev toolbar — Shows user/role/tenant, no controls
-
-**Page arrangement:**
-
-`/admin/logs` (Audit Logs) — operational admin feature:
-- Audit log viewer (from ISSUE-001)
-- "Clear Audit Logs" button (dev mode only, hidden in production)
-- "Archive Audit Logs" button (available in production — moves old logs to archive table or exports)
-
-`/admin/tools` (Developer Tools) — dev infrastructure page:
-- **Database Tools** section (existing: seed, reset)
-- **Runtime Settings** section (new):
-  - DEV_MODE on/off toggle (affects rate limiting + dev features visibility)
-  - Log Level selector (DEBUG / INFO / WARNING / ERROR)
-  - Rate Limiting on/off toggle (independent of DEV_MODE)
-- **System Info** section (new):
-  - Health status (DB connected, Redis connected) — from existing `/health/detailed`
-  - Current Alembic migration version
-  - Python version, FastAPI version
-  - Active env config display (secrets masked)
-- **Request Logs** section (new):
-  - Live tail of recent entries from `logs/app.log`
-  - Filter by log level (ERROR / WARNING / INFO / DEBUG)
-  - Auto-refresh toggle
-
-**Affected files (boilerplate scope):**
-- `backend/app/api/v1/endpoints/admin_tools.py` — Add new endpoints
-- `backend/app/api/v1/endpoints/audit.py` — Add clear/archive endpoints
-- `frontend/src/app/(auth)/admin/tools/page.tsx` — Expand with new sections
-- `frontend/src/app/(auth)/admin/logs/page.tsx` — Add clear/archive buttons (after ISSUE-001)
-- `backend/app/config.py` — Support runtime settings override
-- `backend/app/main.py` — Dynamic log level
-
-**Dependencies:** ISSUE-001 should be completed first (audit logs page must exist before adding clear button to it).
-
-**Instructions for Boilerplate Claude:**
-
-```
-ISSUE: Enhanced Developer Tools
-
-The /admin/tools page only has seed and reset buttons. We need better developer tooling
-for runtime control, system visibility, and log management.
-
-TASK: Enhance developer tools in two pages.
-
-== PART A: Backend Endpoints ==
-
-1. Add to `backend/app/api/v1/endpoints/admin_tools.py` (all require super_admin):
-
-   a. POST /admin/tools/settings — Update runtime settings
-      - Accepts JSON: { "dev_mode": bool, "log_level": str, "rate_limit_enabled": bool }
-      - Stores in an in-memory runtime config that overrides env vars for the running process
-      - Updates loguru log level dynamically: logger.remove() + logger.add() with new level
-      - Updates settings.DEV_MODE and settings.RATE_LIMIT_ENABLED in memory
-      - Returns current settings state
-      - Audit log the change
-
-   b. GET /admin/tools/settings — Get current runtime settings
-      - Returns: { dev_mode, log_level, rate_limit_enabled }
-
-   c. GET /admin/tools/system-info — Get system information
-      - Python version, FastAPI version
-      - Database connection status (reuse health check logic)
-      - Redis connection status
-      - Current Alembic migration version (run `alembic current` or query alembic_version table)
-      - Server uptime
-      - Environment variables (mask SECRET_KEY, DATABASE_URL password, MAIL_PASSWORD, etc.)
-
-   d. GET /admin/tools/logs — Get recent application logs
-      - Query params: level (filter), limit (default 100), offset
-      - Reads from logs/app.log file, parses lines
-      - Returns array of { timestamp, level, message }
-
-2. Add to `backend/app/api/v1/endpoints/audit.py`:
-
-   a. DELETE /admin/audit-logs/ — Clear audit logs (dev mode only)
-      - Check settings.DEV_MODE is True, return 403 if not
-      - Delete all audit log records from database
-      - Audit log the clear action itself (meta — "audit logs cleared")
-      - Return count of deleted records
-
-   b. POST /admin/audit-logs/archive — Archive old audit logs
-      - Query param: before_date (default: 90 days ago)
-      - For now, just delete records older than the date (full archive table is future work)
-      - Return count of archived/deleted records
-      - Works in both dev and production mode
-
-== PART B: Frontend — Expand /admin/tools page ==
-
-3. Expand `frontend/src/app/(auth)/admin/tools/page.tsx` with three new sections
-   below the existing Database Tools section:
-
-   a. "Runtime Settings" card:
-      - DEV_MODE toggle switch (calls POST /admin/tools/settings)
-      - Log Level dropdown: DEBUG, INFO, WARNING, ERROR
-      - Rate Limiting toggle switch
-      - Each change calls the settings endpoint immediately
-      - Show current values on load (GET /admin/tools/settings)
-
-   b. "System Info" card:
-      - Display all fields from GET /admin/tools/system-info
-      - Color-coded status badges for DB and Redis (green=connected, red=disconnected)
-      - Show migration version
-      - Refresh button to re-fetch
-      - Env vars in a collapsible section (values masked by default, click to reveal)
-
-   c. "Request Logs" card:
-      - Table showing recent log entries from GET /admin/tools/logs
-      - Columns: timestamp, level (color-coded badge), message
-      - Level filter dropdown (show all, or filter by ERROR/WARNING/INFO/DEBUG)
-      - Limit selector (50, 100, 200)
-      - Auto-refresh checkbox (polls every 5 seconds when enabled)
-      - Scroll to bottom / scroll to top buttons
-
-   Follow existing patterns from the current seed/reset cards for styling.
-
-== PART C: Frontend — Add buttons to /admin/logs page ==
-
-4. After ISSUE-001 is done (audit logs page exists), add:
-   - "Clear All Logs" button (only visible when DEV_MODE is true)
-     - Confirmation dialog before clearing
-     - Calls DELETE /admin/audit-logs/
-     - Refreshes the log list after clearing
-   - "Archive Old Logs" button (always visible)
-     - Date picker for cutoff date (default: 90 days ago)
-     - Calls POST /admin/audit-logs/archive
-     - Shows count of archived records
-     - Refreshes the log list
-
-== IMPORTANT NOTES ==
-- Runtime settings are in-memory only. Server restart resets to env var values.
-  This is intentional — env vars are the source of truth, runtime is for quick toggling.
-- The clear audit logs endpoint MUST check DEV_MODE. Never allow clearing in production.
-- Mask sensitive env vars: any key containing SECRET, PASSWORD, KEY, TOKEN, or DATABASE_URL.
-- The log file reader should handle the case where logs/app.log doesn't exist yet.
-- All new endpoints need audit logging.
-```
+See Resolved Issues section below.
 
 ---
 
@@ -485,6 +336,28 @@ The `.gitignore` had `logs/` on line 30 which matched `frontend/src/app/(auth)/a
 **Files modified:**
 - `.gitignore` — Fixed overly broad logs/ pattern
 - `frontend/src/app/(auth)/admin/logs/page.tsx` — Now tracked (was created but ignored)
+
+---
+
+### ISSUE-003: Enhanced Developer Tools ✓
+**Resolved:** 2026-02-04
+
+**Summary of implementation:**
+- `/admin/tools` page now has 4 sections: System Info, Runtime Settings, Request Logs, Database Tools
+- Backend endpoints: GET/POST `/admin/tools/settings`, GET `/admin/tools/system-info`, GET `/admin/tools/logs`
+- `/admin/logs` page has Clear (dev mode only) and Archive buttons with confirmation dialogs
+- Backend endpoints: DELETE `/admin/audit-logs/`, POST `/admin/audit-logs/archive`
+- Runtime settings are in-memory (reset on server restart)
+- Dev toolbar restyled as floating bottom-right panel with minimize/expand
+
+**Files modified:**
+- `backend/app/api/v1/endpoints/admin_tools.py` — Added settings, system-info, logs endpoints
+- `backend/app/api/v1/endpoints/audit.py` — Added clear and archive endpoints
+- `frontend/src/app/(auth)/admin/tools/page.tsx` — Full rebuild with 4 sections
+- `frontend/src/app/(auth)/admin/logs/page.tsx` — Added clear/archive UI
+- `frontend/src/lib/api/admin-tools.ts` — New API client
+- `frontend/src/lib/store/devModeStore.ts` — Zustand store for dev mode state
+- `frontend/src/components/dev/dev-toolbar.tsx` — Restyled floating panel
 
 ---
 
