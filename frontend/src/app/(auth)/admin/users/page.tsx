@@ -75,8 +75,8 @@ export default function AllUsersPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">All Users</h1>
-          <p className="text-gray-500">Manage users across all tenants</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">All Users</h1>
+          <p className="text-muted-foreground">Manage users across all tenants</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="px-3 py-1">
@@ -175,7 +175,7 @@ export default function AllUsersPage() {
               ) : users.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
-                    <div className="text-gray-500">No users found</div>
+                    <div className="text-muted-foreground">No users found</div>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -187,30 +187,30 @@ export default function AllUsersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-600">{user.email}</div>
+                      <div className="text-sm text-muted-foreground">{user.email}</div>
                     </TableCell>
                     <TableCell>
                       {user.tenant_name ? (
                         <div>
                           <div className="font-medium text-sm">{user.tenant_name}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             {user.tenant_subdomain}
                           </div>
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-400">System</div>
+                        <div className="text-sm text-muted-foreground">System</div>
                       )}
                     </TableCell>
                     <TableCell>
                       {user.branch_name ? (
                         <div>
                           <div className="text-sm">{user.branch_name}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             {user.branch_code}
                           </div>
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-400">-</div>
+                        <div className="text-sm text-muted-foreground">-</div>
                       )}
                     </TableCell>
                     <TableCell>
@@ -234,7 +234,7 @@ export default function AllUsersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-muted-foreground">
                         {formatDistanceToNow(new Date(user.created_at), {
                           addSuffix: true,
                         })}
@@ -265,7 +265,7 @@ export default function AllUsersPage() {
                 Previous
               </Button>
               <div className="flex items-center gap-1">
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-muted-foreground">
                   Page {page} of {totalPages}
                 </span>
               </div>

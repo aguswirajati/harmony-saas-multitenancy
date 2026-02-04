@@ -139,11 +139,11 @@ export default function UsersPage() {
     switch (role) {
       case 'super_admin':
       case 'admin':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
       case 'manager':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -152,8 +152,8 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Users</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-foreground">Users</h1>
+          <p className="text-muted-foreground mt-1">
             Manage team members and their access
           </p>
         </div>
@@ -169,8 +169,8 @@ export default function UsersPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{total}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Users</p>
+                <p className="text-2xl font-bold text-foreground mt-2">{total}</p>
               </div>
               <UsersIcon className="text-blue-600" size={32} />
             </div>
@@ -180,8 +180,8 @@ export default function UsersPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Users</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-sm font-medium text-muted-foreground">Active Users</p>
+                <p className="text-2xl font-bold text-foreground mt-2">
                   {users.filter(u => u.is_active).length}
                 </p>
               </div>
@@ -195,8 +195,8 @@ export default function UsersPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Admins</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-sm font-medium text-muted-foreground">Admins</p>
+                <p className="text-2xl font-bold text-foreground mt-2">
                   {users.filter(u => ['admin', 'super_admin'].includes(u.role)).length}
                 </p>
               </div>
@@ -208,13 +208,13 @@ export default function UsersPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Staff</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-sm font-medium text-muted-foreground">Staff</p>
+                <p className="text-2xl font-bold text-foreground mt-2">
                   {users.filter(u => u.role === 'staff').length}
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                <UsersIcon className="text-gray-600" size={24} />
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <UsersIcon className="text-muted-foreground" size={24} />
               </div>
             </div>
           </CardContent>
@@ -260,7 +260,7 @@ export default function UsersPage() {
               </div>
               <div className="w-full md:w-64">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
                   <Input
                     placeholder="Search users..."
                     value={search}
@@ -276,12 +276,12 @@ export default function UsersPage() {
           {loading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-              <p className="mt-2 text-gray-600">Loading users...</p>
+              <p className="mt-2 text-muted-foreground">Loading users...</p>
             </div>
           ) : users.length === 0 ? (
             <div className="text-center py-12">
-              <UsersIcon className="mx-auto text-gray-400 mb-4" size={48} />
-              <p className="text-gray-600 mb-4">
+              <UsersIcon className="mx-auto text-muted-foreground mb-4" size={48} />
+              <p className="text-muted-foreground mb-4">
                 {search || roleFilter !== 'all' || branchFilter !== 'all'
                   ? 'No users found matching your filters'
                   : 'No users yet'}
@@ -321,7 +321,7 @@ export default function UsersPage() {
                               {user.full_name || user.email.split('@')[0]}
                             </div>
                             {user.phone && (
-                              <div className="text-xs text-gray-500">{user.phone}</div>
+                              <div className="text-xs text-muted-foreground">{user.phone}</div>
                             )}
                           </div>
                         </div>
@@ -338,10 +338,10 @@ export default function UsersPage() {
                         {user.branch_name ? (
                           <div className="text-sm">
                             <div>{user.branch_name}</div>
-                            <div className="text-xs text-gray-500">{user.branch_code}</div>
+                            <div className="text-xs text-muted-foreground">{user.branch_code}</div>
                           </div>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -410,7 +410,7 @@ export default function UsersPage() {
               </div>
             </div>
           </DialogHeader>
-          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
+          <div className="bg-muted rounded-lg p-4 text-sm text-muted-foreground">
             Upgrade your subscription to add more users. Visit the Settings page to view available plans.
           </div>
           <DialogFooter className="gap-2 sm:gap-0">

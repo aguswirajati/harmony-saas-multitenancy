@@ -110,8 +110,8 @@ export default function AdminStatsPage() {
     <div className="space-y-6 p-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">System Statistics</h1>
-        <p className="text-gray-500">Overview of system-wide metrics and activity</p>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">System Statistics</h1>
+        <p className="text-muted-foreground">Overview of system-wide metrics and activity</p>
       </div>
 
       {/* Overview Cards */}
@@ -179,12 +179,12 @@ export default function AdminStatsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Last 7 days</p>
+                  <p className="text-sm text-muted-foreground">Last 7 days</p>
                   <p className="text-2xl font-bold">{stats.growth.tenants_last_7d}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">Previous 7 days</p>
-                  <p className="text-xl font-semibold text-gray-600">{stats.growth.tenants_prev_7d}</p>
+                  <p className="text-sm text-muted-foreground">Previous 7 days</p>
+                  <p className="text-xl font-semibold text-muted-foreground">{stats.growth.tenants_prev_7d}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -203,7 +203,7 @@ export default function AdminStatsPage() {
                     </span>
                   </>
                 )}
-                <span className="text-sm text-gray-500">vs previous week</span>
+                <span className="text-sm text-muted-foreground">vs previous week</span>
               </div>
             </div>
           </CardContent>
@@ -217,12 +217,12 @@ export default function AdminStatsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Last 7 days</p>
+                  <p className="text-sm text-muted-foreground">Last 7 days</p>
                   <p className="text-2xl font-bold">{stats.growth.users_last_7d}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">Previous 7 days</p>
-                  <p className="text-xl font-semibold text-gray-600">{stats.growth.users_prev_7d}</p>
+                  <p className="text-sm text-muted-foreground">Previous 7 days</p>
+                  <p className="text-xl font-semibold text-muted-foreground">{stats.growth.users_prev_7d}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -241,7 +241,7 @@ export default function AdminStatsPage() {
                     </span>
                   </>
                 )}
-                <span className="text-sm text-gray-500">vs previous week</span>
+                <span className="text-sm text-muted-foreground">vs previous week</span>
               </div>
             </div>
           </CardContent>

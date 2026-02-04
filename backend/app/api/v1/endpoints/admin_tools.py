@@ -1,5 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional, List
+import sys
+import time
+import platform
+import os
+import re
 
 from app.core.database import get_db
 from app.api.deps import get_super_admin_user
@@ -9,11 +16,238 @@ from app.models.branch import Branch
 from app.core.security import get_password_hash
 from app.services.audit_service import AuditService
 from app.models.audit_log import AuditAction, AuditStatus
+from app.config import settings
 from datetime import datetime
 import uuid
+from loguru import logger
 
 router = APIRouter(prefix="/admin/tools", tags=["Admin - Tools"])
 
+# ── In-memory runtime config (resets on server restart) ──────────────────────
+_server_start_time = time.time()
+
+_runtime_settings = {
+    "dev_mode": settings.DEV_MODE,
+    "log_level": "INFO",
+    "rate_limit_enabled": settings.RATE_LIMIT_ENABLED,
+}
+
+# Sensitive env var patterns — values will be masked
+_SENSITIVE_PATTERNS = re.compile(
+    r"(SECRET|PASSWORD|KEY|TOKEN|DATABASE_URL)", re.IGNORECASE
+)
+
+
+# ── Pydantic models for the new endpoints ────────────────────────────────────
+class RuntimeSettingsUpdate(BaseModel):
+    dev_mode: Optional[bool] = None
+    log_level: Optional[str] = None
+    rate_limit_enabled: Optional[bool] = None
+
+
+class RuntimeSettingsResponse(BaseModel):
+    dev_mode: bool
+    log_level: str
+    rate_limit_enabled: bool
+
+
+class LogEntry(BaseModel):
+    timestamp: str
+    level: str
+    message: str
+
+
+# ── Runtime Settings Endpoints ───────────────────────────────────────────────
+
+@router.get("/settings", response_model=RuntimeSettingsResponse)
+async def get_runtime_settings(
+    current_user: User = Depends(get_super_admin_user),
+):
+    """Get current runtime settings (in-memory overrides)."""
+    return RuntimeSettingsResponse(**_runtime_settings)
+
+
+@router.post("/settings", response_model=RuntimeSettingsResponse)
+async def update_runtime_settings(
+    data: RuntimeSettingsUpdate,
+    request: Request,
+    current_user: User = Depends(get_super_admin_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update runtime settings (Super Admin only).
+
+    Changes are in-memory only — a server restart resets to env var values.
+    """
+    changes = {}
+
+    if data.dev_mode is not None:
+        _runtime_settings["dev_mode"] = data.dev_mode
+        settings.DEV_MODE = data.dev_mode
+        changes["dev_mode"] = data.dev_mode
+
+    if data.rate_limit_enabled is not None:
+        _runtime_settings["rate_limit_enabled"] = data.rate_limit_enabled
+        settings.RATE_LIMIT_ENABLED = data.rate_limit_enabled
+        changes["rate_limit_enabled"] = data.rate_limit_enabled
+
+    if data.log_level is not None:
+        level = data.log_level.upper()
+        valid_levels = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+        if level not in valid_levels:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid log level. Must be one of: {', '.join(valid_levels)}",
+            )
+        _runtime_settings["log_level"] = level
+        # Reconfigure loguru
+        logger.remove()
+        logger.add(sys.stderr, level=level)
+        logger.add(
+            "logs/app.log",
+            rotation="500 MB",
+            retention="10 days",
+            level=level,
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
+        )
+        changes["log_level"] = level
+
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        tenant_id=None,
+        action="system.settings_updated",
+        resource="system",
+        details={"changes": changes},
+        status=AuditStatus.SUCCESS,
+        request=request,
+    )
+
+    return RuntimeSettingsResponse(**_runtime_settings)
+
+
+# ── System Info Endpoint ─────────────────────────────────────────────────────
+
+@router.get("/system-info")
+async def get_system_info(
+    current_user: User = Depends(get_super_admin_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get system information including versions, connection statuses,
+    migration version, uptime, and masked environment variables.
+    """
+    import fastapi as _fastapi
+
+    # Database status
+    db_status = "connected"
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"disconnected: {e}"
+
+    # Redis status
+    redis_status = "not_configured"
+    try:
+        from app.middleware.rate_limiter import rate_limiter
+        if rate_limiter.redis_client:
+            await rate_limiter.redis_client.ping()
+            redis_status = "connected"
+    except Exception as e:
+        redis_status = f"disconnected: {e}"
+
+    # Alembic migration version
+    migration_version = "unknown"
+    try:
+        from sqlalchemy import text
+        result = db.execute(text("SELECT version_num FROM alembic_version"))
+        row = result.fetchone()
+        if row:
+            migration_version = row[0]
+    except Exception:
+        pass
+
+    # Uptime
+    uptime_seconds = int(time.time() - _server_start_time)
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    uptime_str = f"{hours}h {minutes}m {secs}s"
+
+    # Masked environment variables
+    env_vars = {}
+    for key, value in sorted(os.environ.items()):
+        if _SENSITIVE_PATTERNS.search(key):
+            env_vars[key] = "********"
+        else:
+            env_vars[key] = value
+
+    return {
+        "python_version": sys.version,
+        "fastapi_version": _fastapi.__version__,
+        "platform": platform.platform(),
+        "database_status": db_status,
+        "redis_status": redis_status,
+        "migration_version": migration_version,
+        "uptime": uptime_str,
+        "uptime_seconds": uptime_seconds,
+        "env_vars": env_vars,
+    }
+
+
+# ── Application Logs Endpoint ────────────────────────────────────────────────
+
+@router.get("/logs", response_model=List[LogEntry])
+async def get_application_logs(
+    level: Optional[str] = Query(None, description="Filter by log level"),
+    limit: int = Query(100, ge=1, le=1000, description="Max entries to return"),
+    offset: int = Query(0, ge=0, description="Number of entries to skip"),
+    current_user: User = Depends(get_super_admin_user),
+):
+    """
+    Read recent application log entries from logs/app.log.
+
+    Returns parsed log entries with timestamp, level, and message.
+    """
+    log_path = "logs/app.log"
+    entries: List[LogEntry] = []
+
+    if not os.path.isfile(log_path):
+        return entries
+
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except Exception:
+        return entries
+
+    # Parse lines (format: "YYYY-MM-DD HH:mm:ss | LEVEL | message")
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+
+        parts = line.split(" | ", 2)
+        if len(parts) == 3:
+            ts, lvl, msg = parts
+            lvl = lvl.strip()
+        else:
+            # Unparseable line — treat as INFO
+            ts = ""
+            lvl = "INFO"
+            msg = line
+
+        if level and lvl.upper() != level.upper():
+            continue
+
+        entries.append(LogEntry(timestamp=ts, level=lvl, message=msg))
+
+    # Apply offset + limit after filtering
+    entries = entries[offset : offset + limit]
+    return entries
+
+
+# ── Existing Endpoints (seed-data, reset-database) ───────────────────────────
 
 @router.post("/seed-data")
 async def seed_dummy_data(

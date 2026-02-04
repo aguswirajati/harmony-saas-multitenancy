@@ -194,14 +194,14 @@ export function TenantDataTable() {
               ) : tenants.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8">
-                    <p className="text-sm text-gray-500">No tenants found</p>
+                    <p className="text-sm text-muted-foreground">No tenants found</p>
                   </TableCell>
                 </TableRow>
               ) : (
                 tenants.map((tenant) => (
                   <TableRow
                     key={tenant.id}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className="cursor-pointer hover:bg-muted/50"
                     onClick={() => router.push(`/admin/tenants/${tenant.id}`)}
                   >
                     <TableCell className="font-medium">
@@ -213,7 +213,7 @@ export function TenantDataTable() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                      <code className="text-xs bg-muted px-2 py-1 rounded">
                         {tenant.subdomain}
                       </code>
                     </TableCell>
@@ -239,7 +239,7 @@ export function TenantDataTable() {
                     <TableCell className="text-right">
                       {tenant.branch_count}
                     </TableCell>
-                    <TableCell className="text-sm text-gray-500">
+                    <TableCell className="text-sm text-muted-foreground">
                       {formatDistanceToNow(new Date(tenant.created_at), {
                         addSuffix: true,
                       })}
@@ -273,7 +273,7 @@ export function TenantDataTable() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-4 py-3">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               Page {page} of {totalPages}
             </div>
             <div className="flex gap-2">
@@ -302,7 +302,7 @@ export function TenantDataTable() {
 
       {/* Summary Info */}
       {response && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           Showing {tenants.length} of {response.total} tenant
           {response.total !== 1 ? 's' : ''}
         </p>

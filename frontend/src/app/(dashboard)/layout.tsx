@@ -11,11 +11,13 @@ import {
   LogOut,
   Menu,
   X,
+  ScrollText,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
+import { usePermission } from '@/hooks/use-permission';
 
 export default function DashboardLayout({
   children,
@@ -31,12 +33,20 @@ export default function DashboardLayout({
     router.push('/login');
   };
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Branches', href: '/branches', icon: Building2 },
-    { name: 'Users', href: '/users', icon: Users },
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ];
+  const canViewAudit = usePermission('audit.view');
+
+  const navigation = useMemo(() => {
+    const items = [
+      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { name: 'Branches', href: '/branches', icon: Building2 },
+      { name: 'Users', href: '/users', icon: Users },
+      { name: 'Settings', href: '/settings', icon: Settings },
+    ];
+    if (canViewAudit) {
+      items.push({ name: 'Audit Logs', href: '/audit-logs', icon: ScrollText });
+    }
+    return items;
+  }, [canViewAudit]);
 
   return (
     <div className="min-h-screen bg-background">

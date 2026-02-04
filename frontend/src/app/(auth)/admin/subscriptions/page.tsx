@@ -138,11 +138,11 @@ export default function SubscriptionsPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <Crown className="h-8 w-8" />
           Subscription Management
         </h1>
-        <p className="text-gray-500 mt-1">
+        <p className="text-muted-foreground mt-1">
           Manage subscription tiers and view tenant distribution
         </p>
       </div>

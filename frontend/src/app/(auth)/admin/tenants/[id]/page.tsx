@@ -355,11 +355,11 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <Building2 className="h-8 w-8" />
               {tenant.name}
             </h1>
-            <p className="text-gray-500 flex items-center gap-2 mt-1">
+            <p className="text-muted-foreground flex items-center gap-2 mt-1">
               <Globe className="h-4 w-4" />
               {tenant.subdomain}.yourdomain.com
             </p>
@@ -597,31 +597,31 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Tenant ID</span>
+              <span className="text-sm text-muted-foreground">Tenant ID</span>
               <code className="text-xs bg-gray-100 px-2 py-1 rounded">{tenant.id}</code>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Subdomain</span>
+              <span className="text-sm text-muted-foreground">Subdomain</span>
               <span className="text-sm font-medium">{tenant.subdomain}</span>
             </div>
             {tenant.domain && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Custom Domain</span>
+                <span className="text-sm text-muted-foreground">Custom Domain</span>
                 <span className="text-sm font-medium">{tenant.domain}</span>
               </div>
             )}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Created</span>
+              <span className="text-sm text-muted-foreground">Created</span>
               <span className="text-sm font-medium">
                 {format(new Date(tenant.created_at), 'MMM d, yyyy')}
                 {' '}
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted-foreground">
                   ({formatDistanceToNow(new Date(tenant.created_at), { addSuffix: true })})
                 </span>
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Last Updated</span>
+              <span className="text-sm text-muted-foreground">Last Updated</span>
               <span className="text-sm">
                 {tenant.updated_at
                   ? formatDistanceToNow(new Date(tenant.updated_at), { addSuffix: true })
@@ -786,18 +786,18 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
               ))}
             </div>
           ) : users.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">No users found</p>
+            <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
           ) : (
             <div className="space-y-2">
               {users.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
                       {user.full_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <p className="font-medium">{user.full_name || user.email}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -831,11 +831,11 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
               ))}
             </div>
           ) : branches.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">No branches found</p>
+            <p className="text-sm text-muted-foreground text-center py-4">No branches found</p>
           ) : (
             <div className="space-y-2">
               {branches.map((branch) => (
-                <div key={branch.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                <div key={branch.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent">
                   <div>
                     <p className="font-medium flex items-center gap-2">
                       {branch.name}
@@ -843,7 +843,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                         <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">HQ</Badge>
                       )}
                     </p>
-                    <p className="text-sm text-gray-500">Code: {branch.code}</p>
+                    <p className="text-sm text-muted-foreground">Code: {branch.code}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {branch.is_active ? (
@@ -851,7 +851,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     ) : (
                       <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Inactive</Badge>
                     )}
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(branch.created_at), { addSuffix: true })}
                     </span>
                   </div>

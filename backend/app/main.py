@@ -55,7 +55,7 @@ Auth endpoints are rate-limited. The `X-RateLimit-*` headers indicate current us
         {"name": "Admin - Users", "description": "Super admin cross-tenant user queries"},
         {"name": "Admin - Stats", "description": "System-wide statistics for super admins"},
         {"name": "Admin - Tools", "description": "Development and maintenance tools (super admin only)"},
-        {"name": "Admin - Audit", "description": "Audit log viewing and analysis (super admin only)"},
+        {"name": "Admin - Audit", "description": "Audit log viewing, management, and analysis (requires audit.view permission)"},
         {"name": "Health", "description": "Service health check endpoints"},
     ]
 )

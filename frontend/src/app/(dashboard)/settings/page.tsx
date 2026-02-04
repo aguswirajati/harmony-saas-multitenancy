@@ -167,7 +167,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -175,8 +175,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-500 mt-1">Manage your organization</p>
+        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+        <p className="text-muted-foreground mt-1">Manage your organization</p>
       </div>
 
       {error && (
@@ -333,7 +333,7 @@ export default function SettingsPage() {
                       <Users className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Users</p>
+                      <p className="text-sm text-muted-foreground">Users</p>
                       <p className="text-xl font-bold">
                         {usage.users_current} / {formatLimit(usage.users_limit)}
                       </p>
@@ -341,19 +341,19 @@ export default function SettingsPage() {
                   </div>
                   {usage.users_limit !== -1 && (
                     <div className="space-y-1">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-muted rounded-full h-2">
                         <div
                           className={`h-2 rounded-full ${getProgressColor(usage.users_percent)}`}
                           style={{ width: `${Math.min(usage.users_percent, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-500 text-right">
+                      <p className="text-xs text-muted-foreground text-right">
                         {usage.users_available === -1 ? 'Unlimited' : `${usage.users_available} available`}
                       </p>
                     </div>
                   )}
                   {usage.users_limit === -1 && (
-                    <p className="text-xs text-gray-500">Unlimited</p>
+                    <p className="text-xs text-muted-foreground">Unlimited</p>
                   )}
                 </CardContent>
               </Card>
@@ -365,7 +365,7 @@ export default function SettingsPage() {
                       <Building2 className="h-5 w-5 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Branches</p>
+                      <p className="text-sm text-muted-foreground">Branches</p>
                       <p className="text-xl font-bold">
                         {usage.branches_current} / {formatLimit(usage.branches_limit)}
                       </p>
@@ -373,19 +373,19 @@ export default function SettingsPage() {
                   </div>
                   {usage.branches_limit !== -1 && (
                     <div className="space-y-1">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-muted rounded-full h-2">
                         <div
                           className={`h-2 rounded-full ${getProgressColor(usage.branches_percent)}`}
                           style={{ width: `${Math.min(usage.branches_percent, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-500 text-right">
+                      <p className="text-xs text-muted-foreground text-right">
                         {usage.branches_available === -1 ? 'Unlimited' : `${usage.branches_available} available`}
                       </p>
                     </div>
                   )}
                   {usage.branches_limit === -1 && (
-                    <p className="text-xs text-gray-500">Unlimited</p>
+                    <p className="text-xs text-muted-foreground">Unlimited</p>
                   )}
                 </CardContent>
               </Card>
@@ -397,7 +397,7 @@ export default function SettingsPage() {
                       <HardDrive className="h-5 w-5 text-purple-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Storage</p>
+                      <p className="text-sm text-muted-foreground">Storage</p>
                       <p className="text-xl font-bold">
                         {usage.storage_used_gb.toFixed(1)} / {formatLimit(usage.storage_limit_gb)}
                         {usage.storage_limit_gb !== -1 && ' GB'}
@@ -406,19 +406,19 @@ export default function SettingsPage() {
                   </div>
                   {usage.storage_limit_gb !== -1 && (
                     <div className="space-y-1">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-muted rounded-full h-2">
                         <div
                           className={`h-2 rounded-full ${getProgressColor(usage.storage_percent)}`}
                           style={{ width: `${Math.min(usage.storage_percent, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-500 text-right">
+                      <p className="text-xs text-muted-foreground text-right">
                         {usage.storage_available_gb.toFixed(1)} GB available
                       </p>
                     </div>
                   )}
                   {usage.storage_limit_gb === -1 && (
-                    <p className="text-xs text-gray-500">Unlimited</p>
+                    <p className="text-xs text-muted-foreground">Unlimited</p>
                   )}
                 </CardContent>
               </Card>
@@ -443,8 +443,8 @@ export default function SettingsPage() {
                         key={tier.tier}
                         className={`border rounded-lg p-4 relative ${
                           isCurrent
-                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                            : 'border-gray-200'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 ring-2 ring-blue-200 dark:ring-blue-800'
+                            : 'border-border'
                         }`}
                       >
                         {isCurrent && (
@@ -461,10 +461,10 @@ export default function SettingsPage() {
                           <h3 className="font-semibold text-lg">{tier.display_name}</h3>
                           <p className="text-2xl font-bold mt-1">
                             ${tier.price_monthly}
-                            <span className="text-sm font-normal text-gray-500">/mo</span>
+                            <span className="text-sm font-normal text-muted-foreground">/mo</span>
                           </p>
                         </div>
-                        <ul className="mt-4 space-y-2 text-sm text-gray-600">
+                        <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                           <li className="flex items-center">
                             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
                             {formatLimit(tier.max_users)} users
@@ -499,7 +499,7 @@ export default function SettingsPage() {
                     );
                   })}
                 </div>
-                <p className="text-sm text-gray-500 mt-4 text-center">
+                <p className="text-sm text-muted-foreground mt-4 text-center">
                   To upgrade your plan, please contact your system administrator.
                 </p>
               </CardContent>

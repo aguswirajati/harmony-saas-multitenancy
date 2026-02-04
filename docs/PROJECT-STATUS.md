@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-01-29
+> Last updated: 2026-02-04
 
 ---
 
@@ -11,8 +11,8 @@
 |------|--------|-------|
 | Multi-tenant isolation | Done | tenant_id FK on all resources, enforced at API + service layer |
 | Authentication (10 endpoints) | Done | Register, login, logout, refresh, forgot/reset password, email verify, accept-invite |
-| Super Admin system (20+ endpoints) | Done | Tenant CRUD, subscriptions, stats, tools, audit logs |
-| Tenant Admin dashboard (4 pages) | Done | Dashboard, users, branches, settings |
+| Super Admin system (25+ endpoints) | Done | Tenant CRUD, subscriptions, stats, tools (runtime settings, system info, logs), audit logs (clear/archive) |
+| Tenant Admin dashboard (5 pages) | Done | Dashboard, users, branches, settings, audit logs |
 | Rate limiting | Done | Redis-based sliding window, per-endpoint config |
 | Audit logging | Done | Full CRUD tracking, security events, IP/user-agent capture |
 | Email service | Done | SMTP with Jinja2 templates (welcome, reset, verify, invite) |
@@ -28,7 +28,7 @@
 | Monitoring (Sentry) | Done | Sentry integration (opt-in via SENTRY_DSN), health checks |
 | Theme switcher | Done | Dark/light mode with next-themes, toggle in sidebar |
 | Permission matrix | Done | RBAC with Permission enum, `require_permission` dependency, `usePermission` hook |
-| Developer mode | Done | `DEV_MODE`/`RATE_LIMIT_ENABLED` env vars, dev toolbar in frontend |
+| Developer mode | Done | `DEV_MODE`/`RATE_LIMIT_ENABLED` env vars, dev toolbar, runtime settings toggle, system info, app log viewer |
 | User invitations | Done | Invite endpoint, accept-invite flow, email integration, 7-day token expiry |
 | Performance benchmarks | Done | `scripts/benchmark.py` with httpx, `docs/PERFORMANCE.md` |
 
@@ -38,7 +38,7 @@
 
 ## 2. What's Implemented
 
-### Backend: 49 API Endpoints across 8 Routers
+### Backend: 55 API Endpoints across 8 Routers
 
 | Router | Prefix | Endpoints | Auth Required |
 |--------|--------|-----------|---------------|
@@ -48,8 +48,8 @@
 | users (admin) | `/api/v1/admin/users` | 1 (cross-tenant listing) | Super Admin |
 | branches | `/api/v1/branches` | 5 (list, get, create, update, delete) | Tenant Admin/Staff |
 | tenant-settings | `/api/v1/tenant` | 7 (self-service: get/update tenant, subscription view, usage, features) | Tenant Admin |
-| audit | `/api/v1/audit` | 4 (list logs, stats, actions, detail) | Admin |
-| admin-tools | `/api/v1/admin/tools` | 2 (seed data, reset DB) | Super Admin |
+| audit | `/api/v1/audit` | 7 (list logs, stats, actions, resources, detail, clear, archive) | Admin (AUDIT_VIEW permission) |
+| admin-tools | `/api/v1/admin/tools` | 5 (seed data, reset DB, settings get/post, system-info, logs) | Super Admin |
 | admin-stats | `/api/v1/admin/stats` | 1 (system-wide statistics) | Super Admin |
 
 ### Backend: Models (4 concrete + 2 abstract bases)
@@ -93,7 +93,7 @@
 | SQLInjectionValidator | Detects SQL keywords, comments, injection patterns |
 | XSSValidator | Detects script tags, javascript: protocol, event handlers |
 
-### Frontend: 21 Pages
+### Frontend: 22 Pages
 
 **Public (6 pages)**:
 | Route | Purpose |
@@ -105,13 +105,14 @@
 | `/verify-email` | Verify email with token |
 | `/accept-invite` | Accept user invitation and set password |
 
-**Dashboard - Tenant Users (4 pages)**:
+**Dashboard - Tenant Users (5 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/dashboard` | Stats, usage cards, quick actions |
 | `/branches` | Branch CRUD with tier limit pre-check |
 | `/users` | User CRUD with tier limit pre-check |
 | `/settings` | Organization tab + Subscription/usage tab |
+| `/audit-logs` | Tenant-scoped audit log viewer (admin only) |
 
 **Admin - Super Admin (11 pages)**:
 | Route | Purpose |
@@ -124,7 +125,7 @@
 | `/admin/stats` | System statistics |
 | `/admin/subscriptions` | Subscription tier overview and management |
 | `/admin/logs` | Audit log viewer |
-| `/admin/tools` | Database tools (seed, reset) |
+| `/admin/tools` | Developer tools (seed, reset, runtime settings, system info, logs) |
 | `/admin/settings/organization` | Admin org settings |
 | `/admin/settings/subscription` | Admin subscription settings |
 
@@ -326,5 +327,8 @@ Before this project can be considered a production-ready boilerplate:
 | 7 | 2026-01-28 | E2E Testing | Playwright setup, 22 E2E tests (5 spec files: registration, login, forgot-password, dashboard, navigation), CI integration with PostgreSQL + Redis + backend |
 | 8 | 2026-01-29 | Boilerplate finalization | Theme switcher (dark/light), permission matrix (RBAC), dev mode tools, user invitation system, performance benchmarks, fork guide |
 | 9 | 2026-01-29 | ERP foundation | Audit user tracking (created/updated/deleted_by_id on BaseModel), TenantScopedModel abstract base, tenant code column, health check text() fix |
+| 10 | 2026-01-30 | Developer tools & audit permissions | Fixed audit permission inconsistency (permission-based auth + tenant scoping), enhanced dev tools (runtime settings, system info, app logs), audit log clear/archive, tenant audit logs page |
+| 11 | 2026-02-04 | Dark mode & UI polish | Fixed dark mode text colors across admin/dashboard pages (branches, users, settings), dev tools card reordering (System Info → Runtime Settings → Request Logs → Database Tools), admin dashboard welcome card conditional (only when no tenants), dev toolbar fix (only show when logged in), TenantDataTable dark mode fixes |
+| 12 | 2026-02-04 | React hooks bug fix | Fixed "Rendered fewer hooks than expected" crash on /admin/tools page when toggling dev_mode off - moved all hooks above conditional early return |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

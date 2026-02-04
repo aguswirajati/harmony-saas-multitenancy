@@ -82,10 +82,10 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Welcome Section */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-3xl font-bold text-foreground">
           Welcome back, {user?.first_name || user?.email}!
         </h1>
-        <p className="text-gray-500 mt-1">
+        <p className="text-muted-foreground mt-1">
           Here's what's happening with your business today.
         </p>
       </div>
@@ -97,14 +97,14 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">
+                  <p className="text-sm font-medium text-muted-foreground">
                     {stat.name}
                   </p>
                   {isLoading ? (
                     <Skeleton className="h-8 w-16 mt-2" />
                   ) : (
                     <>
-                      <p className="text-2xl font-bold text-gray-900 mt-2">
+                      <p className="text-2xl font-bold text-foreground mt-2">
                         {stat.value}
                       </p>
                       {stat.subtext && stat.href ? (
@@ -113,7 +113,7 @@ export default function DashboardPage() {
                           <ArrowRight size={12} />
                         </Link>
                       ) : stat.subtext ? (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {stat.subtext}
                         </p>
                       ) : null}
@@ -170,21 +170,21 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between py-2 border-b">
-              <span className="text-gray-600">Email</span>
+              <span className="text-muted-foreground">Email</span>
               <span className="font-medium">{user?.email}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-gray-600">Role</span>
+              <span className="text-muted-foreground">Role</span>
               <span className="font-medium capitalize">{user?.role}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-gray-600">Status</span>
+              <span className="text-muted-foreground">Status</span>
               <span className="font-medium text-green-600">
                 {user?.is_active ? 'Active' : 'Inactive'}
               </span>
             </div>
             <div className="flex justify-between py-2">
-              <span className="text-gray-600">Verified</span>
+              <span className="text-muted-foreground">Verified</span>
               <span className="font-medium">
                 {user?.is_verified ? '✓ Yes' : '✗ No'}
               </span>
@@ -199,20 +199,20 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between py-2 border-b">
-              <span className="text-gray-600">Company</span>
+              <span className="text-muted-foreground">Company</span>
               <span className="font-medium">{tenant?.name}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-gray-600">Subdomain</span>
+              <span className="text-muted-foreground">Subdomain</span>
               <span className="font-medium">{tenant?.subdomain}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-gray-600">Plan</span>
+              <span className="text-muted-foreground">Plan</span>
               <span className="font-medium capitalize">{tenant?.tier}</span>
             </div>
             <div className="flex justify-between py-2">
-              <span className="text-gray-600">ID</span>
-              <span className="font-mono text-xs text-gray-500">
+              <span className="text-muted-foreground">ID</span>
+              <span className="font-mono text-xs text-muted-foreground">
                 {tenant?.id}
               </span>
             </div>
@@ -228,24 +228,24 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link href="/branches" className="p-4 border rounded-lg hover:bg-gray-50 transition-colors text-left block">
+            <Link href="/branches" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
               <Building2 className="text-blue-600 mb-2" size={24} />
               <h3 className="font-medium">Add Branch</h3>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Create a new branch location
               </p>
             </Link>
-            <Link href="/users" className="p-4 border rounded-lg hover:bg-gray-50 transition-colors text-left block">
+            <Link href="/users" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
               <Users className="text-green-600 mb-2" size={24} />
               <h3 className="font-medium">Invite User</h3>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Add a new team member
               </p>
             </Link>
-            <Link href="/settings?tab=subscription" className="p-4 border rounded-lg hover:bg-gray-50 transition-colors text-left block">
+            <Link href="/settings?tab=subscription" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
               <Settings className="text-purple-600 mb-2" size={24} />
               <h3 className="font-medium">Subscription</h3>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 View plans and usage
               </p>
             </Link>

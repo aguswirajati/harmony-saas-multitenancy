@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,6 +21,7 @@ export default function LoginPage() {
     password: '',
     tenant_subdomain: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   // Check auth on mount and redirect if already authenticated
   useEffect(() => {
@@ -75,7 +76,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
@@ -115,21 +116,32 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="tenant_subdomain">
-                Tenant Subdomain <span className="text-gray-400">(Optional)</span>
+                Tenant Subdomain <span className="text-muted-foreground">(Optional)</span>
               </Label>
               <Input
                 id="tenant_subdomain"
@@ -140,7 +152,7 @@ export default function LoginPage() {
                 onChange={handleChange}
                 disabled={isLoading}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Leave empty if you only have one account
               </p>
             </div>
@@ -163,14 +175,14 @@ export default function LoginPage() {
         </CardContent>
 
         <CardFooter className="flex flex-col space-y-4">
-          <div className="text-sm text-center text-gray-600">
+          <div className="text-sm text-center text-muted-foreground">
             Don't have an account?{' '}
             <Link href="/register" className="text-blue-600 hover:underline font-medium">
               Register here
             </Link>
           </div>
 
-          <div className="text-xs text-center text-gray-500">
+          <div className="text-xs text-center text-muted-foreground">
             Demo account: admin@demo.com / admin123
           </div>
         </CardFooter>

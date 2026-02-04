@@ -61,10 +61,10 @@ export default function SubscriptionSettingsPage() {
     <div className="space-y-6 p-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
           Subscription & Usage
         </h1>
-        <p className="text-gray-500">
+        <p className="text-muted-foreground">
           View your current plan, usage, and upgrade options
         </p>
       </div>
@@ -94,7 +94,7 @@ export default function SubscriptionSettingsPage() {
                       {currentTier}
                     </h3>
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {tenant?.subscription_status === 'active'
                       ? 'Active subscription'
                       : tenant?.subscription_status === 'trial'
@@ -153,11 +153,11 @@ export default function SubscriptionSettingsPage() {
                               <span className="text-3xl font-bold">
                                 ${tier.price_monthly}
                               </span>
-                              <span className="text-sm text-gray-500">
+                              <span className="text-sm text-muted-foreground">
                                 /month
                               </span>
                               {tier.price_yearly > 0 && (
-                                <span className="text-sm text-gray-500">
+                                <span className="text-sm text-muted-foreground">
                                   or ${tier.price_yearly}/year
                                 </span>
                               )}
@@ -237,7 +237,7 @@ export default function SubscriptionSettingsPage() {
                   <h3 className="font-semibold mb-1">
                     Need a Custom Plan?
                   </h3>
-                  <p className="text-sm text-gray-600 mb-3">
+                  <p className="text-sm text-muted-foreground mb-3">
                     Contact our sales team for custom enterprise solutions with
                     tailored pricing and features.
                   </p>

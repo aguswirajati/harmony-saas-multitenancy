@@ -1,8 +1,10 @@
 'use client';
 
 import { useAuthStore } from '@/lib/store/authStore';
+import { useDevModeStore } from '@/lib/store/devModeStore';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import {
   LayoutDashboard,
   Building2,
@@ -14,7 +16,8 @@ import {
   Shield,
   Database,
   Wrench,
-  Crown
+  Crown,
+  Bug
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
@@ -26,6 +29,7 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const { user, logout } = useAuthStore();
+  const { devMode, toggleDevMode } = useDevModeStore();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -35,15 +39,20 @@ export default function AdminLayout({
     router.push('/login');
   };
 
-  const navigation = [
+  const baseNavigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Tenants', href: '/admin/tenants', icon: Building2 },
     { name: 'All Users', href: '/admin/users', icon: Users },
     { name: 'Subscriptions', href: '/admin/subscriptions', icon: Crown },
     { name: 'Audit Logs', href: '/admin/logs', icon: Shield },
     { name: 'Statistics', href: '/admin/stats', icon: TrendingUp },
-    { name: 'Database Tools', href: '/admin/tools', icon: Wrench },
   ];
+
+  const devNavigation = [
+    { name: 'Developer Tools', href: '/admin/tools', icon: Wrench },
+  ];
+
+  const navigation = devMode ? [...baseNavigation, ...devNavigation] : baseNavigation;
 
   const isActiveLink = (href: string) => {
     if (href === '/admin') {
@@ -59,7 +68,7 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Mobile header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-linear-to-r from-purple-600 to-blue-600 text-white px-4 py-3 flex items-center justify-between shadow-lg">
         <div className="flex items-center space-x-3">
@@ -131,11 +140,22 @@ export default function AdminLayout({
             })}
           </nav>
 
-          {/* System Info */}
-          <div className="p-4 border-t border-white/10 bg-black/10">
-            <div className="flex items-center space-x-2 mb-2 text-xs text-purple-200">
+          {/* System Info & Dev Mode Toggle */}
+          <div className="p-4 border-t border-white/10 bg-black/10 space-y-3">
+            <div className="flex items-center space-x-2 text-xs text-purple-200">
               <Database size={14} />
               <span>System Status: Online</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs text-purple-200">
+                <Bug size={14} />
+                <span>Dev Mode</span>
+              </div>
+              <Switch
+                checked={devMode}
+                onCheckedChange={toggleDevMode}
+                className="data-[state=checked]:bg-amber-500"
+              />
             </div>
           </div>
 

@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 1 (Critical Foundation): 100% complete.**
 
 What's built:
-- 49 API endpoints across 8 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats)
-- 21 frontend pages (6 public, 4 dashboard, 11 admin)
+- 55 API endpoints across 8 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats)
+- 22 frontend pages (6 public, 5 dashboard, 11 admin)
 - 5 models (User, Tenant, Branch, AuditLog) + BaseModel and TenantScopedModel abstract bases
 - 6 services (Auth, Tenant, User, Branch, Audit, Email)
 - 3 middleware (rate limiter, error handler, request logger)
@@ -16,7 +16,7 @@ What's built:
 - Permission matrix (RBAC with `require_permission` dependency + `usePermission` hook)
 - Dark/light theme switcher (next-themes)
 - User invitation system (invite + accept-invite flow)
-- Developer mode tools (DEV_MODE flag, dev toolbar)
+- Developer mode tools (DEV_MODE flag, dev toolbar, runtime settings, system info, app log viewer)
 - Performance benchmark script
 - 73 backend tests (tenant isolation, auth, services, authorization) - all passing
 - 20 Playwright E2E tests passing + 2 fixme (registration, login, dashboard, navigation)
@@ -368,10 +368,13 @@ class Item(Base, TenantScopedModel):
 **Integrated into**: auth endpoints (login/logout/register/password-reset), tenant endpoints (CRUD, subscription, status), user endpoints (CRUD, role changes).
 
 **API endpoints** (`backend/app/api/v1/endpoints/audit.py`):
-- `GET /api/v1/audit/logs` - List with filters
-- `GET /api/v1/audit/logs/{id}` - Detail
-- `GET /api/v1/audit/stats` - Statistics
-- `GET /api/v1/audit/actions` - Available action types
+- `GET /api/v1/admin/audit-logs/` - List with filters (permission-based: super admins see all, tenant admins see own tenant)
+- `GET /api/v1/admin/audit-logs/{id}` - Detail (tenant-scoped)
+- `GET /api/v1/admin/audit-logs/statistics` - Statistics (tenant-scoped)
+- `GET /api/v1/admin/audit-logs/actions` - Available action types (tenant-scoped)
+- `GET /api/v1/admin/audit-logs/resources` - Available resource types (tenant-scoped)
+- `DELETE /api/v1/admin/audit-logs/` - Clear all audit logs (DEV_MODE only, super admin)
+- `POST /api/v1/admin/audit-logs/archive` - Archive old logs before date (super admin)
 
 ### Email Service
 
@@ -431,8 +434,12 @@ Located in `backend/app/core/validators.py`. Used in Pydantic schemas via `field
 - `GET /api/v1/admin/stats` - System-wide statistics (tenant counts, user counts, tier distribution)
 
 **Admin Tools** (`backend/app/api/v1/endpoints/admin_tools.py`):
-- `POST /api/v1/admin/tools/seed` - Seed sample data for development
-- `POST /api/v1/admin/tools/reset` - Reset database (development only)
+- `GET /api/v1/admin/tools/settings` - Get current runtime settings (in-memory)
+- `POST /api/v1/admin/tools/settings` - Update runtime settings (dev_mode, log_level, rate_limit_enabled)
+- `GET /api/v1/admin/tools/system-info` - System info (versions, DB/Redis status, migration, uptime, env vars)
+- `GET /api/v1/admin/tools/logs` - Read application log entries from logs/app.log
+- `POST /api/v1/admin/tools/seed-data` - Seed sample data for development
+- `POST /api/v1/admin/tools/reset-database` - Reset database (development only)
 
 ## Important Code Patterns
 

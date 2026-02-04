@@ -111,8 +111,8 @@ export default function BranchesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Branches</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-foreground">Branches</h1>
+          <p className="text-muted-foreground mt-1">
             Manage your organization's branch locations
           </p>
         </div>
@@ -128,8 +128,8 @@ export default function BranchesPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Branches</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{total}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Branches</p>
+                <p className="text-2xl font-bold text-foreground mt-2">{total}</p>
               </div>
               <Building2 className="text-blue-600" size={32} />
             </div>
@@ -139,8 +139,8 @@ export default function BranchesPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Branches</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-sm font-medium text-muted-foreground">Active Branches</p>
+                <p className="text-2xl font-bold text-foreground mt-2">
                   {branches.filter(b => b.is_active).length}
                 </p>
               </div>
@@ -154,8 +154,8 @@ export default function BranchesPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Headquarters</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-sm font-medium text-muted-foreground">Headquarters</p>
+                <p className="text-2xl font-bold text-foreground mt-2">
                   {branches.filter(b => b.is_hq).length}
                 </p>
               </div>
@@ -177,7 +177,7 @@ export default function BranchesPage() {
             </div>
             <div className="w-64">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
                 <Input
                   placeholder="Search branches..."
                   value={search}
@@ -192,12 +192,12 @@ export default function BranchesPage() {
           {loading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-              <p className="mt-2 text-gray-600">Loading branches...</p>
+              <p className="mt-2 text-muted-foreground">Loading branches...</p>
             </div>
           ) : branches.length === 0 ? (
             <div className="text-center py-12">
-              <Building2 className="mx-auto text-gray-400 mb-4" size={48} />
-              <p className="text-gray-600 mb-4">
+              <Building2 className="mx-auto text-muted-foreground mb-4" size={48} />
+              <p className="text-muted-foreground mb-4">
                 {search ? 'No branches found matching your search' : 'No branches yet'}
               </p>
               {!search && (
@@ -232,7 +232,7 @@ export default function BranchesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <code className="text-sm bg-gray-100 px-2 py-1 rounded">
+                        <code className="text-sm bg-muted px-2 py-1 rounded">
                           {branch.code}
                         </code>
                       </TableCell>
@@ -243,20 +243,20 @@ export default function BranchesPage() {
                               {branch.city}, {branch.province}
                             </>
                           ) : branch.city || branch.province || (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm space-y-1">
                           {branch.phone && (
-                            <div className="text-gray-600">{branch.phone}</div>
+                            <div className="text-muted-foreground">{branch.phone}</div>
                           )}
                           {branch.email && (
-                            <div className="text-gray-500 text-xs">{branch.email}</div>
+                            <div className="text-muted-foreground text-xs">{branch.email}</div>
                           )}
                           {!branch.phone && !branch.email && (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </div>
                       </TableCell>
@@ -322,7 +322,7 @@ export default function BranchesPage() {
               </div>
             </div>
           </DialogHeader>
-          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
+          <div className="bg-muted rounded-lg p-4 text-sm text-muted-foreground">
             Upgrade your subscription to add more branches. Visit the Settings page to view available plans.
           </div>
           <DialogFooter className="gap-2 sm:gap-0">

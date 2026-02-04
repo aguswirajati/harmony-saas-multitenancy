@@ -102,10 +102,10 @@ export default function OrganizationSettingsPage() {
     <div className="space-y-6 p-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
           Organization Settings
         </h1>
-        <p className="text-gray-500">
+        <p className="text-muted-foreground">
           Manage your organization's information and preferences
         </p>
       </div>
@@ -146,7 +146,7 @@ export default function OrganizationSettingsPage() {
                   .harmony.com
                 </span>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Subdomain cannot be changed
               </p>
             </div>
@@ -165,7 +165,7 @@ export default function OrganizationSettingsPage() {
               )}
               {tenant?.logo_url && (
                 <div className="mt-2">
-                  <p className="text-xs text-gray-500 mb-2">Current logo:</p>
+                  <p className="text-xs text-muted-foreground mb-2">Current logo:</p>
                   <img
                     src={tenant.logo_url}
                     alt="Organization logo"
@@ -241,13 +241,13 @@ export default function OrganizationSettingsPage() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label className="text-gray-500">Current Plan</Label>
+                <Label className="text-muted-foreground">Current Plan</Label>
                 <p className="text-lg font-semibold capitalize mt-1">
                   {tenant?.tier}
                 </p>
               </div>
               <div>
-                <Label className="text-gray-500">Status</Label>
+                <Label className="text-muted-foreground">Status</Label>
                 <p className="text-lg font-semibold capitalize mt-1">
                   {tenant?.subscription_status}
                 </p>
