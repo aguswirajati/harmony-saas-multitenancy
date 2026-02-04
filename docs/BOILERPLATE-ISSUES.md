@@ -34,48 +34,13 @@ This document tracks issues identified in Harmony that belong to the **boilerpla
 
 ## Open Issues
 
-### ISSUE-002: Audit Log Permission Inconsistency
+*No open issues at this time.*
 
-**Classification:** Boilerplate
-**Severity:** Medium
-**Status:** OPEN (can be deferred — address when tenant-level audit viewing is needed)
-**Date identified:** 2026-01-30
+---
 
-**Problem:**
-The permission matrix grants `AUDIT_VIEW` to both `super_admin` and `admin` roles, but the backend endpoint hardcodes `get_super_admin_user` dependency. This means tenant admins cannot view their own tenant's audit logs even though the permission system says they should.
+### ~~ISSUE-002: Audit Log Permission Inconsistency~~ → RESOLVED
 
-**Affected files (boilerplate scope):**
-- `backend/app/api/v1/endpoints/audit.py` — All endpoints use `Depends(get_super_admin_user)`
-- `backend/app/core/permissions.py` — Grants `AUDIT_VIEW` to admin role
-
-**Decision needed:** Should tenant admins see their own tenant's audit logs?
-- If YES: Change endpoints to use `require_permission(Permission.AUDIT_VIEW)` and scope queries by tenant_id for non-super-admins
-- If NO: Remove `AUDIT_VIEW` from admin role permissions to keep the matrix consistent
-
-**Instructions for Boilerplate Claude (when ready to fix):**
-
-```
-ISSUE: Audit Log Permission Inconsistency
-
-The Permission enum has AUDIT_VIEW granted to both super_admin and admin roles
-in ROLE_PERMISSIONS, but the audit endpoints hardcode `get_super_admin_user`.
-
-TASK: Make audit endpoints permission-based instead of role-hardcoded.
-
-1. In `backend/app/api/v1/endpoints/audit.py`:
-   - Replace `Depends(get_super_admin_user)` with `Depends(require_permission(Permission.AUDIT_VIEW))`
-   - For non-super-admin users, automatically scope queries by their tenant_id
-   - Super admins can still filter by any tenant using query params
-
-2. Optionally add a tenant-scoped audit endpoint under the dashboard router
-   (e.g., GET /api/v1/audit/logs) so tenant admins have a natural access point,
-   separate from the admin-prefixed routes.
-
-3. Update the frontend to add an audit log viewer in the tenant dashboard
-   if tenant admins should see their own audit logs.
-
-4. Keep the admin/audit-logs endpoints working as before for super admins.
-```
+See Resolved Issues section below.
 
 ---
 
@@ -336,6 +301,27 @@ The `.gitignore` had `logs/` on line 30 which matched `frontend/src/app/(auth)/a
 **Files modified:**
 - `.gitignore` — Fixed overly broad logs/ pattern
 - `frontend/src/app/(auth)/admin/logs/page.tsx` — Now tracked (was created but ignored)
+
+---
+
+### ISSUE-002: Audit Log Permission Inconsistency ✓
+**Resolved:** 2026-01-30
+
+**Problem:**
+The permission matrix granted `AUDIT_VIEW` to both `super_admin` and `admin` roles, but the backend endpoints hardcoded `get_super_admin_user` dependency. Tenant admins couldn't view their own audit logs.
+
+**Fix:**
+1. Replaced `Depends(get_super_admin_user)` with `Depends(require_permission(Permission.AUDIT_VIEW))` on read endpoints
+2. Added `_apply_tenant_scope()` helper: non-super-admin users are automatically filtered to `current_user.tenant_id`; super admins retain full cross-tenant access
+3. Created tenant audit logs page at `/dashboard/audit-logs` with `tenantAuditAPI`
+4. Added conditional sidebar link based on `audit.view` permission
+5. Kept `clear` and `archive` endpoints as super-admin only (destructive operations)
+
+**Files modified:**
+- `backend/app/api/v1/endpoints/audit.py` — Permission-based auth with tenant scoping
+- `frontend/src/lib/api/audit.ts` — Added `tenantAuditAPI` export
+- `frontend/src/app/(dashboard)/audit-logs/page.tsx` — New tenant audit logs page
+- `frontend/src/app/(dashboard)/layout.tsx` — Conditional sidebar link
 
 ---
 
