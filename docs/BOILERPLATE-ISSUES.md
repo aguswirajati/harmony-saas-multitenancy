@@ -34,66 +34,6 @@ This document tracks issues identified in Harmony that belong to the **boilerpla
 
 ## Open Issues
 
-### ISSUE-001: Super Admin Cannot Access Audit Logs Page
-
-**Classification:** Boilerplate
-**Severity:** High
-**Status:** OPEN
-**Date identified:** 2026-01-30
-
-**Problem:**
-1. The admin sidebar has a navigation link to `/admin/logs` but no page exists at that route
-2. The backend audit endpoints (`/api/v1/admin/audit-logs/`) use `get_super_admin_user` dependency, which works for super admins at the API level, but there is no frontend page to display the data
-3. Additionally, tenant admins have `AUDIT_VIEW` permission in the permission matrix but cannot access audit logs because the endpoint hardcodes `get_super_admin_user` instead of using `require_permission(Permission.AUDIT_VIEW)`
-
-**Affected files (boilerplate scope):**
-- `frontend/src/app/(auth)/admin/logs/page.tsx` — MISSING, needs to be created
-- `backend/app/api/v1/endpoints/audit.py` — Uses `get_super_admin_user` instead of permission-based access
-
-**Expected behavior:**
-- Super admin should see a working audit logs page at `/admin/logs` with filtering by tenant, user, action, date range
-- The page should call the existing `/api/v1/admin/audit-logs/` backend endpoints
-
-**Instructions for Boilerplate Claude:**
-
-```
-ISSUE: Super Admin Audit Logs Page Missing
-
-The admin sidebar links to `/admin/logs` but no page exists. The backend API endpoints
-are already built at `/api/v1/admin/audit-logs/` with 5 endpoints (list, detail, statistics,
-actions, resources), all requiring super_admin access.
-
-TASK: Create the audit logs frontend page for super admin.
-
-1. Create `frontend/src/app/(auth)/admin/logs/page.tsx`:
-   - Data table showing audit log entries
-   - Columns: timestamp, user email, tenant name, action, resource, status, IP address
-   - Filters: tenant dropdown, action type dropdown, date range picker, search by user
-   - Pagination (server-side, using skip/limit params)
-   - Click row to see detail (modal or expand)
-   - Statistics summary at top (total logs, actions breakdown) using /statistics endpoint
-   - Use the existing API endpoints:
-     - GET /api/v1/admin/audit-logs/ (list with filters)
-     - GET /api/v1/admin/audit-logs/{id} (detail)
-     - GET /api/v1/admin/audit-logs/statistics (stats)
-     - GET /api/v1/admin/audit-logs/actions (action types for filter dropdown)
-     - GET /api/v1/admin/audit-logs/resources (resource types for filter dropdown)
-
-2. Create `frontend/src/lib/api/audit.ts`:
-   - API client functions for all 5 audit endpoints
-   - TypeScript types for audit log entries and responses
-
-3. The admin sidebar already has the link at `/admin/logs` in the layout file,
-   so no navigation changes needed.
-
-4. Follow existing patterns from other admin pages (e.g., admin/tenants, admin/users)
-   for layout, styling, and component patterns.
-
-5. Use shadcn/ui components (Table, Card, Select, DatePicker if available, Badge for status).
-```
-
----
-
 ### ISSUE-002: Audit Log Permission Inconsistency
 
 **Classification:** Boilerplate
@@ -527,6 +467,26 @@ TASK: Fix dark mode colors, rename sidebar item, group database tools, restyle d
 ---
 
 ## Resolved Issues
+
+### ISSUE-001: Super Admin Cannot Access Audit Logs Page ✓
+**Resolved:** 2026-02-04
+
+**Problem:**
+The admin sidebar linked to `/admin/logs` but the page file was being ignored by `.gitignore` due to a broad `logs/` pattern that matched any directory named "logs".
+
+**Root cause:**
+The `.gitignore` had `logs/` on line 30 which matched `frontend/src/app/(auth)/admin/logs/` directory, causing the page to never be committed to git.
+
+**Fix:**
+1. Changed `.gitignore` pattern from `logs/` to `/logs/` (root-only)
+2. Added negation pattern `!frontend/src/app/**/logs/` to explicitly include admin logs pages
+3. Committed the previously-ignored `frontend/src/app/(auth)/admin/logs/page.tsx` file
+
+**Files modified:**
+- `.gitignore` — Fixed overly broad logs/ pattern
+- `frontend/src/app/(auth)/admin/logs/page.tsx` — Now tracked (was created but ignored)
+
+---
 
 ### ISSUE-005: React Hooks Order Violation in Developer Tools Page ✓
 **Resolved:** 2026-02-04

@@ -27,9 +27,11 @@ __pycache__/
 
 # Logs
 *.log
-logs/
+/logs/
 backend/logs/
 frontend/logs/
+# Don't ignore frontend admin logs page
+!frontend/src/app/**/logs/
 
 # -------------------------------------------------------------------------
 # FRONTEND (Next.js / Node.js)
