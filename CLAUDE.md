@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 1 (Critical Foundation): 100% complete.**
 
 What's built:
-- 55 API endpoints across 8 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats)
+- 57 API endpoints across 8 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats)
 - 22 frontend pages (6 public, 5 dashboard, 11 admin)
 - 5 models (User, Tenant, Branch, AuditLog) + BaseModel and TenantScopedModel abstract bases
 - 6 services (Auth, Tenant, User, Branch, Audit, Email)
@@ -17,6 +17,7 @@ What's built:
 - Dark/light theme switcher (next-themes)
 - User invitation system (invite + accept-invite flow)
 - Developer mode tools (DEV_MODE flag, dev toolbar, runtime settings, system info, app log viewer)
+- Format settings (tenant-level currency, number, date formatting with live preview)
 - Performance benchmark script
 - 73 backend tests (tenant isolation, auth, services, authorization) - all passing
 - 20 Playwright E2E tests passing + 2 fixme (registration, login, dashboard, navigation)
@@ -343,6 +344,12 @@ class Item(Base, TenantScopedModel):
   - Development-only error details (stack traces)
   - Error IDs for support reference in production
 
+**Server/Client Component Pattern**:
+For Next.js 16 Turbopack SSR compatibility, layouts and pages with client-side interactivity use a server/client split:
+- Server component (e.g., `layout.tsx`) with `export const dynamic = 'force-dynamic'`
+- Client component (e.g., `AdminLayoutClient.tsx`) with all hooks and onClick handlers
+- Examples: `app/(auth)/admin/layout.tsx` + `AdminLayoutClient.tsx`, `app/(dashboard)/layout.tsx` + `DashboardLayoutClient.tsx`
+
 **Directory Structure**:
 - `app/(auth)/admin/*` - Super admin pages
 - `app/(dashboard)/*` - Tenant user dashboard
@@ -392,6 +399,38 @@ class Item(Base, TenantScopedModel):
 - `MAIL_ENABLED` (set `False` for development)
 - `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME`
 - `FRONTEND_URL` (for email link generation)
+
+### Format Settings
+
+Tenant-level regional preferences for currency, numbers, and dates.
+
+**Schema** (`backend/app/schemas/tenant.py`):
+```python
+class FormatSettings(BaseModel):
+    currency_code: str = "IDR"              # ISO 4217 code
+    currency_symbol_position: "before" | "after" = "before"
+    decimal_separator: str = ","            # . or ,
+    thousands_separator: str = "."          # . or , or space
+    price_decimal_places: int = 0           # 0-4
+    quantity_decimal_places: int = 0        # 0-4
+    date_format: str = "DD/MM/YYYY"         # Display format
+    timezone: str = "Asia/Jakarta"          # IANA timezone
+```
+
+**API Endpoints**:
+- `GET /api/v1/tenant/format` - Get tenant format settings
+- `PUT /api/v1/tenant/format` - Update tenant format settings
+
+**Frontend Utilities** (`lib/utils/format.ts`):
+- `formatCurrency(amount, settings)` - Format with currency symbol
+- `formatNumber(value, settings)` - Format with separators
+- `formatQuantity(value, settings)` - Format quantities
+- `formatDate(date, settings)` - Format dates
+- `formatDateTime(date, settings)` - Format date + time
+
+**React Query Hook** (`hooks/use-format-settings.ts`):
+- `useFormatSettings()` - Full CRUD hook with mutation
+- `useFormatters()` - Lightweight read-only hook for formatting
 
 ### Middleware Stack
 
@@ -569,6 +608,8 @@ if current_user_count >= tenant.max_users:
 | `frontend/src/lib/api/auth.ts` | Auth API calls (login, register, refresh, password reset) |
 | `frontend/src/lib/store/authStore.ts` | Zustand auth state store |
 | `frontend/src/hooks/use-permission.ts` | Frontend permission checking hook |
+| `frontend/src/hooks/use-format-settings.ts` | Format settings hook (React Query) |
+| `frontend/src/lib/utils/format.ts` | Currency, number, date formatting utilities |
 | `frontend/src/components/theme-provider.tsx` | next-themes dark/light mode provider |
 | `frontend/src/components/dev/dev-toolbar.tsx` | Development-only debug toolbar |
 | `frontend/middleware.ts` | **Critical**: Route protection & role-based redirects |
@@ -596,6 +637,7 @@ if current_user_count >= tenant.max_users:
 11. **Permissions**: Keep `ROLE_PERMISSIONS` in sync between backend (`core/permissions.py`) and frontend (`hooks/use-permission.ts`)
 12. **Dev mode**: Set `DEV_MODE=true` in `.env` to disable rate limiting and show dev toolbar
 13. **Invitation tokens**: Expire after 7 days; invited users are inactive until they accept
+14. **Server/Client components**: Layouts with onClick handlers need the server/client split pattern for Next.js 16 Turbopack SSR
 
 ## Testing Infrastructure
 

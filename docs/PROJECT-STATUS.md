@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-02-04
+> Last updated: 2026-02-07
 
 ---
 
@@ -31,6 +31,7 @@
 | Developer mode | Done | `DEV_MODE`/`RATE_LIMIT_ENABLED` env vars, dev toolbar, runtime settings toggle, system info, app log viewer |
 | User invitations | Done | Invite endpoint, accept-invite flow, email integration, 7-day token expiry |
 | Performance benchmarks | Done | `scripts/benchmark.py` with httpx, `docs/PERFORMANCE.md` |
+| Format settings | Done | Tenant-level currency, number, date formatting with live preview in settings |
 
 **Overall**: Phase 1 (Critical Foundation) is **100% complete**. Boilerplate finalization features added.
 
@@ -38,7 +39,7 @@
 
 ## 2. What's Implemented
 
-### Backend: 55 API Endpoints across 8 Routers
+### Backend: 57 API Endpoints across 8 Routers
 
 | Router | Prefix | Endpoints | Auth Required |
 |--------|--------|-----------|---------------|
@@ -47,7 +48,7 @@
 | users | `/api/v1/users` | 7 (list, get, create, update, delete, change-password, invite) | Tenant Admin/Staff |
 | users (admin) | `/api/v1/admin/users` | 1 (cross-tenant listing) | Super Admin |
 | branches | `/api/v1/branches` | 5 (list, get, create, update, delete) | Tenant Admin/Staff |
-| tenant-settings | `/api/v1/tenant` | 7 (self-service: get/update tenant, subscription view, usage, features) | Tenant Admin |
+| tenant-settings | `/api/v1/tenant` | 9 (self-service: get/update tenant, subscription view, usage, features, format settings get/update) | Tenant Admin |
 | audit | `/api/v1/audit` | 7 (list logs, stats, actions, resources, detail, clear, archive) | Admin (AUDIT_VIEW permission) |
 | admin-tools | `/api/v1/admin/tools` | 5 (seed data, reset DB, settings get/post, system-info, logs) | Super Admin |
 | admin-stats | `/api/v1/admin/stats` | 1 (system-wide statistics) | Super Admin |
@@ -111,7 +112,7 @@
 | `/dashboard` | Stats, usage cards, quick actions |
 | `/branches` | Branch CRUD with tier limit pre-check |
 | `/users` | User CRUD with tier limit pre-check |
-| `/settings` | Organization tab + Subscription/usage tab |
+| `/settings` | Organization tab + Subscription/usage tab + Format settings tab |
 | `/audit-logs` | Tenant-scoped audit log viewer (admin only) |
 
 **Admin - Super Admin (11 pages)**:
@@ -330,5 +331,6 @@ Before this project can be considered a production-ready boilerplate:
 | 10 | 2026-01-30 | Developer tools & audit permissions | Fixed audit permission inconsistency (permission-based auth + tenant scoping), enhanced dev tools (runtime settings, system info, app logs), audit log clear/archive, tenant audit logs page |
 | 11 | 2026-02-04 | Dark mode & UI polish | Fixed dark mode text colors across admin/dashboard pages (branches, users, settings), dev tools card reordering (System Info → Runtime Settings → Request Logs → Database Tools), admin dashboard welcome card conditional (only when no tenants), dev toolbar fix (only show when logged in), TenantDataTable dark mode fixes |
 | 12 | 2026-02-04 | React hooks bug fix | Fixed "Rendered fewer hooks than expected" crash on /admin/tools page when toggling dev_mode off - moved all hooks above conditional early return |
+| 13 | 2026-02-07 | SSR fix & Format settings | Fixed Next.js 16 Turbopack SSR prerender error (server/client component split pattern), implemented tenant-level format settings (currency, number, date formatting with live preview) |
 
 Detailed session logs: [`docs/sessions/`](sessions/)
