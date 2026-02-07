@@ -12,7 +12,7 @@ from app.models.tenant import Tenant
 from app.services.tenant_service import TenantService
 from app.schemas.tenant import (
     TenantResponse, TenantSettingsUpdate, TenantUsageResponse,
-    AvailableTiers
+    AvailableTiers, FormatSettings
 )
 
 router = APIRouter(prefix="/tenant-settings", tags=["Tenant Settings"])
@@ -81,14 +81,14 @@ def update_tenant_settings(
 ):
     """
     Update tenant settings (self-service)
-    
+
     **Tenant Admin Only**
-    
+
     Allows tenant admins to update:
     - Organization name
     - Logo URL
     - Custom settings (timezone, language, etc.)
-    
+
     Cannot update:
     - Subscription tier (contact super admin)
     - Limits (contact super admin)
@@ -96,6 +96,49 @@ def update_tenant_settings(
     """
     service = TenantService(db)
     return service.update_tenant_settings(current_tenant.id, settings_data)
+
+
+@router.get("/format", response_model=FormatSettings)
+def get_format_settings(
+    db: Session = Depends(get_db),
+    current_tenant: Tenant = Depends(get_current_tenant)
+):
+    """
+    Get current format settings for the tenant
+
+    **Available to all authenticated users**
+
+    Returns format settings for currency, numbers, and dates:
+    - currency_code: ISO currency code (e.g., "IDR", "USD")
+    - currency_symbol_position: "before" or "after"
+    - decimal_separator: Character for decimals (e.g., "," or ".")
+    - thousands_separator: Character for thousands (e.g., "." or ",")
+    - price_decimal_places: Number of decimal places for prices (0-4)
+    - quantity_decimal_places: Number of decimal places for quantities (0-4)
+    - date_format: Date display format (e.g., "DD/MM/YYYY")
+    - timezone: Tenant timezone (e.g., "Asia/Jakarta")
+    """
+    service = TenantService(db)
+    return service.get_format_settings(current_tenant.id)
+
+
+@router.put("/format", response_model=FormatSettings)
+def update_format_settings(
+    format_data: FormatSettings,
+    db: Session = Depends(get_db),
+    current_tenant: Tenant = Depends(get_current_tenant),
+    current_user: User = Depends(verify_tenant_admin)
+):
+    """
+    Update format settings for the tenant
+
+    **Tenant Admin Only (requires settings.update permission)**
+
+    Updates format settings for currency, numbers, and dates.
+    Settings are stored in the tenant.settings['format'] JSON field.
+    """
+    service = TenantService(db)
+    return service.update_format_settings(current_tenant.id, format_data)
 
 
 @router.get("/limits/users")

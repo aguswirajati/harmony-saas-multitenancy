@@ -54,18 +54,23 @@ function AcceptInviteForm() {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.post('/auth/accept-invite', {
+      interface AcceptInviteResponse {
+        message: string;
+        user: { id: string; email: string };
+        tokens?: { access_token: string; refresh_token: string };
+      }
+
+      const response = await apiClient.post<AcceptInviteResponse>('/auth/accept-invite', {
         token,
         password: formData.password,
         first_name: formData.firstName || undefined,
         last_name: formData.lastName || undefined,
       });
 
-      // Store tokens
-      const { tokens } = response.data;
-      if (tokens) {
-        localStorage.setItem('access_token', tokens.access_token);
-        localStorage.setItem('refresh_token', tokens.refresh_token);
+      // Store tokens (apiClient returns data directly)
+      if (response.tokens) {
+        localStorage.setItem('access_token', response.tokens.access_token);
+        localStorage.setItem('refresh_token', response.tokens.refresh_token);
       }
 
       setSuccess(true);

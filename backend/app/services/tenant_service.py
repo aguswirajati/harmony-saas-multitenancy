@@ -17,7 +17,7 @@ from app.schemas.tenant import (
     TenantCreate, TenantUpdate, TenantSubscriptionUpdate,
     TenantFeatureUpdate, TenantStatusUpdate, TenantResponse,
     TenantSummary, TenantStats, SystemStats, TenantUsageResponse,
-    TenantSettingsUpdate, TierInfo, AvailableTiers
+    TenantSettingsUpdate, TierInfo, AvailableTiers, FormatSettings
 )
 from app.core.security import get_password_hash
 from app.core.exceptions import (
@@ -637,19 +637,52 @@ class TenantService:
     ) -> Tenant:
         """Allow tenant to update their own settings (non-subscription)"""
         tenant = self.get_tenant_by_id(tenant_id)
-        
+
         if settings_data.name:
             tenant.name = settings_data.name
         if settings_data.logo_url:
             tenant.logo_url = settings_data.logo_url
         if settings_data.settings:
             tenant.settings = settings_data.settings
-        
+
         self.db.commit()
         self.db.refresh(tenant)
-        
+
         logger.info(f"Tenant {tenant.subdomain} updated their settings")
         return tenant
+
+    def get_format_settings(self, tenant_id: UUID) -> FormatSettings:
+        """Get format settings from tenant.settings['format'] or return defaults"""
+        tenant = self.get_tenant_by_id(tenant_id)
+
+        format_data = tenant.settings.get("format", {}) if tenant.settings else {}
+
+        return FormatSettings(**format_data)
+
+    def update_format_settings(
+        self,
+        tenant_id: UUID,
+        format_settings: FormatSettings
+    ) -> FormatSettings:
+        """Update format settings in tenant.settings['format']"""
+        tenant = self.get_tenant_by_id(tenant_id)
+
+        # Initialize settings if None
+        if tenant.settings is None:
+            tenant.settings = {}
+
+        # Merge format settings into tenant.settings
+        tenant.settings["format"] = format_settings.model_dump()
+
+        # Mark settings as modified for SQLAlchemy to detect the change
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(tenant, "settings")
+
+        self.db.commit()
+        self.db.refresh(tenant)
+
+        logger.info(f"Tenant {tenant.subdomain} updated format settings")
+        return format_settings
     
     def get_available_tiers(self, current_tier: str) -> AvailableTiers:
         """Get list of available subscription tiers with pricing"""

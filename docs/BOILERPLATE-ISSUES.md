@@ -34,19 +34,781 @@ This document tracks issues identified in Harmony that belong to the **boilerpla
 
 ## Open Issues
 
-*No open issues at this time.*
+### ~~ISSUE-007: Format Settings / Regional Preferences~~ → RESOLVED
+
+**Classification:** Boilerplate (with extension points for business features)
+**Severity:** Low (enhancement)
+**Status:** RESOLVED
+**Type:** New Feature
+**Date identified:** 2026-02-06
+**Date resolved:** 2026-02-07
+
+**Problem:**
+The application lacks tenant-level format settings for currency, number formatting, and date display. Currently, any formatting is hardcoded, making it difficult for tenants in different regions to customize their display preferences.
+
+**Proposed Settings:**
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `currency_code` | string | "IDR" | ISO currency code for display |
+| `currency_symbol_position` | "before" \| "after" | "before" | Rp 1.000 vs 1.000 Rp |
+| `decimal_separator` | string | "," | Decimal separator (e.g., "," or ".") |
+| `thousands_separator` | string | "." | Thousands separator (e.g., "." or ",") |
+| `price_decimal_places` | 0-4 | 0 | Decimal places for prices |
+| `quantity_decimal_places` | 0-4 | 0 | Decimal places for stock/qty |
+| `date_format` | string | "DD/MM/YYYY" | Date display format |
+| `timezone` | string | "Asia/Jakarta" | Tenant timezone |
+
+**Storage:**
+Use existing `tenant.settings` JSON field — no schema change needed.
+
+**Affected files (boilerplate scope):**
+- `backend/app/schemas/tenant.py` — Add FormatSettings schema with validation
+- `backend/app/services/tenant_service.py` — Add get/update format settings methods
+- `backend/app/api/v1/endpoints/tenant_settings.py` — Add format settings endpoints (or extend existing)
+- `frontend/src/app/(dashboard)/settings/page.tsx` — Add Format Settings card
+- `frontend/src/hooks/use-format-settings.ts` — New hook for accessing settings
+- `frontend/src/lib/utils/format.ts` — New file with formatCurrency, formatNumber, formatDate helpers
+
+**Instructions for Boilerplate Claude:**
+
+```
+ISSUE: Format Settings / Regional Preferences
+
+The application needs tenant-level format settings for currency, numbers, and dates.
+These settings should be stored in the existing tenant.settings JSON field.
+
+TASK: Implement format settings feature.
+
+== PART A: Backend ==
+
+1. In `backend/app/schemas/tenant.py`, add a FormatSettings schema:
+   ```python
+   class FormatSettings(BaseModel):
+       currency_code: str = "IDR"
+       currency_symbol_position: Literal["before", "after"] = "before"
+       decimal_separator: str = ","
+       thousands_separator: str = "."
+       price_decimal_places: int = Field(default=0, ge=0, le=4)
+       quantity_decimal_places: int = Field(default=0, ge=0, le=4)
+       date_format: str = "DD/MM/YYYY"
+       timezone: str = "Asia/Jakarta"
+   ```
+
+2. In `backend/app/services/tenant_service.py`, add methods:
+   - `get_format_settings(db, tenant_id) -> FormatSettings` — Returns settings from tenant.settings["format"] or defaults
+   - `update_format_settings(db, tenant_id, settings: FormatSettings)` — Merges into tenant.settings["format"]
+
+3. In `backend/app/api/v1/endpoints/tenant_settings.py` (or create if not exists):
+   - `GET /api/v1/tenant/settings/format` — Returns current format settings
+   - `PUT /api/v1/tenant/settings/format` — Updates format settings
+   - Both require `settings.update` permission
+
+== PART B: Frontend ==
+
+4. Create `frontend/src/lib/utils/format.ts`:
+   ```typescript
+   export interface FormatSettings {
+     currency_code: string;
+     currency_symbol_position: 'before' | 'after';
+     decimal_separator: string;
+     thousands_separator: string;
+     price_decimal_places: number;
+     quantity_decimal_places: number;
+     date_format: string;
+     timezone: string;
+   }
+
+   export const DEFAULT_FORMAT_SETTINGS: FormatSettings = {
+     currency_code: 'IDR',
+     currency_symbol_position: 'before',
+     decimal_separator: ',',
+     thousands_separator: '.',
+     price_decimal_places: 0,
+     quantity_decimal_places: 0,
+     date_format: 'DD/MM/YYYY',
+     timezone: 'Asia/Jakarta',
+   };
+
+   export function formatCurrency(amount: number, settings: FormatSettings): string {
+     // Format with thousands separator and decimal places
+     // Add currency symbol in correct position
+   }
+
+   export function formatNumber(value: number, decimals: number, settings: FormatSettings): string {
+     // Format with separators
+   }
+
+   export function formatDate(date: Date | string, settings: FormatSettings): string {
+     // Format according to date_format setting
+   }
+   ```
+
+5. Create `frontend/src/hooks/use-format-settings.ts`:
+   - React Query hook to fetch and cache format settings
+   - Returns { settings, formatCurrency, formatNumber, formatDate } functions pre-bound to settings
+   - Falls back to DEFAULT_FORMAT_SETTINGS while loading
+
+6. In `frontend/src/app/(dashboard)/settings/page.tsx`:
+   - Add a "Format Settings" Card section
+   - Fields for each setting with appropriate inputs:
+     - Currency code: text input or select with common currencies
+     - Symbol position: radio buttons (before/after)
+     - Separators: text inputs with validation
+     - Decimal places: number inputs (0-4)
+     - Date format: select with common formats
+     - Timezone: searchable select with timezone list
+   - Save button to update settings
+
+== NOTES ==
+
+- Timezone list can use Intl.supportedValuesOf('timeZone') in modern browsers
+- Date format should support common patterns: DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, etc.
+- Currency symbol lookup can use a simple map or Intl.NumberFormat
+- The settings UI should show a preview of how amounts/dates will appear
+- Consider using react-hook-form for the settings form
+```
+
+**Resolution:**
+- Added `FormatSettings` schema to `backend/app/schemas/tenant.py`
+- Added `get_format_settings()` and `update_format_settings()` to `backend/app/services/tenant_service.py`
+- Added `GET/PUT /tenant-settings/format` endpoints to `backend/app/api/v1/endpoints/tenant_settings.py`
+- Created `frontend/src/lib/utils/format.ts` with formatting utilities and currency/timezone options
+- Created `frontend/src/hooks/use-format-settings.ts` React Query hook
+- Updated `frontend/src/app/(dashboard)/settings/page.tsx` with new Format Settings tab containing:
+  - Live preview card showing how values will appear
+  - Currency settings (code, symbol position, decimal places)
+  - Number format (decimal/thousands separators, quantity decimals)
+  - Date & time (format, timezone)
+
+---
+
+### ISSUE-009: Data Masking Utility for Sensitive PII
+
+**Classification:** Boilerplate (utility + permission)
+**Severity:** Low (security enhancement)
+**Status:** OPEN
+**Type:** New Feature
+**Date identified:** 2026-02-06
+
+**Problem:**
+The application does not mask sensitive PII (phone numbers, emails) in list views. All users with access to a page can see full unmasked data. For compliance and privacy, sensitive fields should be masked by default and only shown unmasked to users with specific permissions.
+
+**What's needed:**
+
+1. **Frontend masking utility** (`frontend/src/lib/utils/mask.ts`):
+   - `maskPhone(phone, hasPermission)` → `****1234`
+   - `maskEmail(email, hasPermission)` → `j***@example.com`
+   - `maskNIK(nik, hasPermission)` → `********1234` (for Indonesian ID numbers)
+
+2. **New permission** in `backend/app/core/permissions.py`:
+   - `SENSITIVE_DATA_VIEW = "sensitive_data.view"`
+   - Granted to: `super_admin`, `admin` (not `staff` by default)
+
+3. **Frontend permission hook update** in `frontend/src/hooks/use-permission.ts`:
+   - Add `SENSITIVE_DATA_VIEW` to permission types
+   - Mirror the backend ROLE_PERMISSIONS mapping
+
+**NOT in boilerplate scope:** Applying the masking to specific views (customer list, supplier contacts) is business feature scope—handled in Harmony directly.
+
+**Instructions for Boilerplate Claude:**
+
+```
+ISSUE: Data Masking Utility for Sensitive PII
+
+The application needs utilities to mask sensitive data (phone, email) with permission-based reveal.
+
+TASK: Implement masking utility and permission.
+
+== PART A: Backend Permission ==
+
+1. In `backend/app/core/permissions.py`:
+   - Add to Permission enum: `SENSITIVE_DATA_VIEW = "sensitive_data.view"`
+   - Add to ROLE_PERMISSIONS:
+     - super_admin: include SENSITIVE_DATA_VIEW
+     - admin: include SENSITIVE_DATA_VIEW
+     - staff: do NOT include (they see masked data)
+
+== PART B: Frontend Utility ==
+
+2. Create `frontend/src/lib/utils/mask.ts`:
+
+   ```typescript
+   /**
+    * Masks a phone number, showing only last 4 digits
+    * @example maskPhone('081234567890', false) → '********7890'
+    */
+   export function maskPhone(phone: string | null | undefined, canViewSensitive: boolean): string {
+     if (!phone) return '-';
+     if (canViewSensitive) return phone;
+     if (phone.length <= 4) return '****';
+     return '*'.repeat(phone.length - 4) + phone.slice(-4);
+   }
+
+   /**
+    * Masks an email address, showing first char and domain
+    * @example maskEmail('john@example.com', false) → 'j***@example.com'
+    */
+   export function maskEmail(email: string | null | undefined, canViewSensitive: boolean): string {
+     if (!email) return '-';
+     if (canViewSensitive) return email;
+     const [local, domain] = email.split('@');
+     if (!domain) return '***';
+     return `${local[0] || '*'}***@${domain}`;
+   }
+
+   /**
+    * Masks an ID number (NIK, SSN, etc.), showing only last 4 digits
+    * @example maskIdNumber('1234567890123456', false) → '************3456'
+    */
+   export function maskIdNumber(id: string | null | undefined, canViewSensitive: boolean): string {
+     if (!id) return '-';
+     if (canViewSensitive) return id;
+     if (id.length <= 4) return '****';
+     return '*'.repeat(id.length - 4) + id.slice(-4);
+   }
+   ```
+
+3. In `frontend/src/hooks/use-permission.ts`:
+   - Add 'sensitive_data.view' to the Permission type
+   - Add it to ROLE_PERMISSIONS for super_admin and admin
+
+== USAGE EXAMPLE (for reference, not part of this task) ==
+
+In a customer list component:
+```tsx
+const canViewSensitive = usePermission('sensitive_data.view');
+
+<TableCell>{maskPhone(customer.phone, canViewSensitive)}</TableCell>
+<TableCell>{maskEmail(customer.email, canViewSensitive)}</TableCell>
+```
+```
+
+---
+
+### ISSUE-008: HttpOnly Cookies for JWT Tokens
+
+**Classification:** Boilerplate
+**Severity:** Low (security enhancement)
+**Status:** OPEN
+**Type:** Security Improvement
+**Date identified:** 2026-02-06
+
+**Problem:**
+JWT tokens are currently stored in localStorage, which is vulnerable to XSS attacks. A more secure approach is to store tokens in HttpOnly cookies, which JavaScript cannot access.
+
+**Current implementation:**
+- Frontend stores `access_token` and `refresh_token` in localStorage
+- Frontend sends `Authorization: Bearer <token>` header on each request
+- Works, but if XSS occurs, attacker can steal tokens
+
+**Proposed implementation:**
+- Backend sets HttpOnly, Secure, SameSite cookies on login/refresh
+- Frontend no longer stores tokens in localStorage (cookies sent automatically)
+- Backend reads token from cookie instead of Authorization header
+- Requires CSRF protection since cookies are sent automatically
+
+**Trade-offs:**
+| Aspect | localStorage (current) | HttpOnly cookies |
+|--------|----------------------|------------------|
+| XSS vulnerability | Tokens can be stolen | Tokens protected |
+| CSRF vulnerability | Not applicable | Needs CSRF token |
+| Implementation | Simple | More complex |
+| Cross-domain | Works with CORS | Needs same-site or complex setup |
+| Mobile apps | Works | Requires hybrid approach |
+
+**Decision:** This is a significant architectural change. Recommended to defer until:
+1. The application is preparing for production with real user data
+2. There's a clear requirement for enhanced security (compliance, enterprise customers)
+3. The team can invest time in implementing CSRF protection properly
+
+**Affected files (boilerplate scope):**
+- `backend/app/api/v1/endpoints/auth.py` — Set cookies on login/refresh
+- `backend/app/api/deps.py` — Read token from cookie or header
+- `backend/app/core/security.py` — Cookie configuration
+- `frontend/src/lib/api/client.ts` — Remove localStorage token handling
+- `frontend/src/lib/store/authStore.ts` — Remove token storage
+- `frontend/middleware.ts` — May need to read auth state differently
+
+**Instructions for Boilerplate Claude:**
+
+```
+ISSUE: HttpOnly Cookies for JWT Tokens
+
+This is a DEFERRED issue. Do not implement unless explicitly requested.
+
+The implementation requires:
+1. Backend cookie-setting on login/refresh responses
+2. CSRF protection (double-submit cookie or synchronizer token pattern)
+3. Frontend refactoring to remove localStorage token handling
+4. Careful testing of cross-origin scenarios
+
+When implementing, reference:
+- FastAPI cookie setting: response.set_cookie()
+- CSRF: fastapi-csrf-protect or custom implementation
+- Cookie flags: HttpOnly=True, Secure=True (production), SameSite='Lax'
+```
+
+---
+
+### ~~ISSUE-006: Next.js 16 Turbopack SSR Prerender Error with Button onClick~~ → RESOLVED
+
+**Classification:** Boilerplate
+**Severity:** Critical (build-breaking)
+**Status:** RESOLVED
+**Date identified:** 2026-02-06
+**Date resolved:** 2026-02-07
+
+**Problem:**
+Next.js 16 with Turbopack (default bundler) fails to build with error:
+```
+Error: Event handlers cannot be passed to Client Component props.
+  {onClick: function onClick, variant: ..., className: ..., children: ...}
+            ^^^^^^^^^^^^^^^^
+If you need interactivity, consider converting part of this to a Client Component.
+```
+
+This happens during static page generation (prerendering) even for pages marked with `'use client'`. The issue is that Next.js 16 still attempts to prerender client components during build, and event handlers cannot be serialized.
+
+**Root cause:**
+- Pages/layouts with `'use client'` that contain Button components with `onClick` handlers
+- `export const dynamic = 'force-dynamic'` only works in **server components**, not client components
+- Next.js 16 Turbopack prerenders all pages by default during build
+
+**Affected files (boilerplate scope):**
+- `frontend/src/app/(auth)/admin/layout.tsx` - Admin layout with Button onClick
+- `frontend/src/app/(auth)/admin/logs/page.tsx` - Audit logs page with Button onClick
+- `frontend/src/app/(dashboard)/layout.tsx` - Dashboard layout with Button onClick
+- `frontend/src/app/not-found.tsx` - 404 page with Button onClick (window.history.back)
+
+**Solution pattern:**
+Split each affected file into two parts:
+1. **Server component** (page.tsx or layout.tsx) - exports `dynamic = 'force-dynamic'` and imports client component
+2. **Client component** (*Client.tsx) - has `'use client'` and contains all UI with event handlers
+
+**Instructions for Boilerplate Claude:**
+
+```
+ISSUE: Next.js 16 Turbopack SSR Prerender Error
+
+Next.js 16 with Turbopack fails to build pages that have Button onClick handlers,
+even with 'use client' directive. The error is:
+"Event handlers cannot be passed to Client Component props"
+
+This happens because Next.js 16 prerenders pages during build, and onClick handlers
+cannot be serialized. The fix is to use a server component wrapper with
+`export const dynamic = 'force-dynamic'` which skips prerendering.
+
+IMPORTANT: `export const dynamic = 'force-dynamic'` only works in SERVER components,
+not client components. So we need to split each page/layout into two files.
+
+TASK: Apply the server component wrapper pattern to these files.
+
+== FILE 1: Admin Layout ==
+
+1. Create `frontend/src/app/(auth)/admin/AdminLayoutClient.tsx`:
+   - Move ALL content from current layout.tsx here
+   - Keep the `'use client'` directive at top
+   - Export as default function `AdminLayoutClient`
+
+2. Replace `frontend/src/app/(auth)/admin/layout.tsx` with:
+   ```tsx
+   // Force dynamic rendering to skip static generation for all admin pages
+   export const dynamic = 'force-dynamic';
+
+   import AdminLayoutClient from './AdminLayoutClient';
+
+   export default function AdminLayout({
+     children,
+   }: {
+     children: React.ReactNode
+   }) {
+     return <AdminLayoutClient>{children}</AdminLayoutClient>;
+   }
+   ```
+
+== FILE 2: Admin Logs Page ==
+
+3. Create `frontend/src/app/(auth)/admin/logs/AuditLogsClient.tsx`:
+   - Move ALL content from current page.tsx here
+   - Keep the `'use client'` directive at top
+   - Export as default function `AuditLogsClient`
+
+4. Replace `frontend/src/app/(auth)/admin/logs/page.tsx` with:
+   ```tsx
+   // Force dynamic rendering to skip static generation
+   export const dynamic = 'force-dynamic';
+
+   import AuditLogsClient from './AuditLogsClient';
+
+   export default function AuditLogsPage() {
+     return <AuditLogsClient />;
+   }
+   ```
+
+== FILE 3: Dashboard Layout ==
+
+5. Create `frontend/src/app/(dashboard)/DashboardLayoutClient.tsx`:
+   - Move ALL content from current layout.tsx here
+   - Keep the `'use client'` directive at top
+   - Export as default function `DashboardLayoutClient`
+
+6. Replace `frontend/src/app/(dashboard)/layout.tsx` with:
+   ```tsx
+   // Force dynamic rendering to skip static generation for all dashboard pages
+   export const dynamic = 'force-dynamic';
+
+   import DashboardLayoutClient from './DashboardLayoutClient';
+
+   export default function DashboardLayout({
+     children,
+   }: {
+     children: React.ReactNode
+   }) {
+     return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
+   }
+   ```
+
+== FILE 4: Not Found Page ==
+
+7. Create `frontend/src/app/NotFoundClient.tsx`:
+   - Move ALL content from current not-found.tsx here
+   - Add `'use client'` directive at top
+   - Export as default function `NotFoundClient`
+
+8. Replace `frontend/src/app/not-found.tsx` with:
+   ```tsx
+   // Force dynamic rendering to skip static generation
+   export const dynamic = 'force-dynamic';
+
+   import NotFoundClient from './NotFoundClient';
+
+   export default function NotFound() {
+     return <NotFoundClient />;
+   }
+   ```
+
+== VERIFICATION ==
+
+After applying all changes, run `npm run build` in the frontend directory.
+The build should complete successfully with routes showing:
+- ○ (Static) for public pages like /login, /register
+- ƒ (Dynamic) for admin and dashboard pages
+
+== WHY THIS WORKS ==
+
+1. Server component with `export const dynamic = 'force-dynamic'` tells Next.js
+   to skip prerendering and render on-demand
+2. The server component imports the client component which has all the UI
+3. Since the server component is never prerendered, the client component's
+   onClick handlers are never serialized during build
+4. At runtime, the client component hydrates normally with full interactivity
+```
+
+**Resolution:**
+- Created `frontend/src/app/(auth)/admin/AdminLayoutClient.tsx` - client component with all admin layout UI
+- Updated `frontend/src/app/(auth)/admin/layout.tsx` - server wrapper with `export const dynamic = 'force-dynamic'`
+- Created `frontend/src/app/(auth)/admin/logs/AuditLogsClient.tsx` - client component for audit logs page
+- Updated `frontend/src/app/(auth)/admin/logs/page.tsx` - server wrapper
+- Created `frontend/src/app/(dashboard)/DashboardLayoutClient.tsx` - client component for dashboard layout
+- Updated `frontend/src/app/(dashboard)/layout.tsx` - server wrapper
+- Created `frontend/src/app/NotFoundClient.tsx` - client component for 404 page
+- Updated `frontend/src/app/not-found.tsx` - server wrapper
+
+**Harmony local fix applied:**
+The fix has been applied locally in Harmony. When pulling boilerplate updates after this issue is fixed there, expect conflicts in:
+- `frontend/src/app/(dashboard)/layout.tsx` - Harmony has added master data navigation items
+
+**Conflict resolution strategy:**
+1. Accept the new server component wrapper pattern from boilerplate
+2. Re-add Harmony's master data navigation items to `DashboardLayoutClient.tsx`
+3. The navigation items to preserve are in the `masterDataNav` array
+
+---
+
+---
+
+## Resolved Issues
+
+### ~~ISSUE-001: Super Admin Cannot Access Audit Logs Page~~ → RESOLVED
+
+**Classification:** Boilerplate
+**Severity:** High
+**Status:** RESOLVED
+**Date identified:** 2026-01-30
+**Date resolved:** 2026-02-04
+
+**Problem:**
+1. The admin sidebar has a navigation link to `/admin/logs` but no page exists at that route
+2. The backend audit endpoints (`/api/v1/admin/audit-logs/`) use `get_super_admin_user` dependency, which works for super admins at the API level, but there is no frontend page to display the data
+3. Additionally, tenant admins have `AUDIT_VIEW` permission in the permission matrix but cannot access audit logs because the endpoint hardcodes `get_super_admin_user` instead of using `require_permission(Permission.AUDIT_VIEW)`
+
+**Affected files (boilerplate scope):**
+- `frontend/src/app/(auth)/admin/logs/page.tsx` — MISSING, needs to be created
+- `backend/app/api/v1/endpoints/audit.py` — Uses `get_super_admin_user` instead of permission-based access
+
+**Expected behavior:**
+- Super admin should see a working audit logs page at `/admin/logs` with filtering by tenant, user, action, date range
+- The page should call the existing `/api/v1/admin/audit-logs/` backend endpoints
+
+**Instructions for Boilerplate Claude:**
+
+```
+ISSUE: Super Admin Audit Logs Page Missing
+
+The admin sidebar links to `/admin/logs` but no page exists. The backend API endpoints
+are already built at `/api/v1/admin/audit-logs/` with 5 endpoints (list, detail, statistics,
+actions, resources), all requiring super_admin access.
+
+TASK: Create the audit logs frontend page for super admin.
+
+1. Create `frontend/src/app/(auth)/admin/logs/page.tsx`:
+   - Data table showing audit log entries
+   - Columns: timestamp, user email, tenant name, action, resource, status, IP address
+   - Filters: tenant dropdown, action type dropdown, date range picker, search by user
+   - Pagination (server-side, using skip/limit params)
+   - Click row to see detail (modal or expand)
+   - Statistics summary at top (total logs, actions breakdown) using /statistics endpoint
+   - Use the existing API endpoints:
+     - GET /api/v1/admin/audit-logs/ (list with filters)
+     - GET /api/v1/admin/audit-logs/{id} (detail)
+     - GET /api/v1/admin/audit-logs/statistics (stats)
+     - GET /api/v1/admin/audit-logs/actions (action types for filter dropdown)
+     - GET /api/v1/admin/audit-logs/resources (resource types for filter dropdown)
+
+2. Create `frontend/src/lib/api/audit.ts`:
+   - API client functions for all 5 audit endpoints
+   - TypeScript types for audit log entries and responses
+
+3. The admin sidebar already has the link at `/admin/logs` in the layout file,
+   so no navigation changes needed.
+
+4. Follow existing patterns from other admin pages (e.g., admin/tenants, admin/users)
+   for layout, styling, and component patterns.
+
+5. Use shadcn/ui components (Table, Card, Select, DatePicker if available, Badge for status).
+```
+
+**Resolution:**
+- Created `/admin/logs` page for super admin with full filtering and pagination
+- Created tenant dashboard `/audit-logs` page for tenant admins
+- Created `frontend/src/lib/api/audit.ts` with all API functions
+- Backend endpoints now use `require_permission(Permission.AUDIT_VIEW)` with tenant scoping
 
 ---
 
 ### ~~ISSUE-002: Audit Log Permission Inconsistency~~ → RESOLVED
 
-See Resolved Issues section below.
+**Classification:** Boilerplate
+**Severity:** Medium
+**Status:** RESOLVED
+**Date identified:** 2026-01-30
+**Date resolved:** 2026-02-04
+
+**Problem:**
+The permission matrix grants `AUDIT_VIEW` to both `super_admin` and `admin` roles, but the backend endpoint hardcodes `get_super_admin_user` dependency. This means tenant admins cannot view their own tenant's audit logs even though the permission system says they should.
+
+**Affected files (boilerplate scope):**
+- `backend/app/api/v1/endpoints/audit.py` — All endpoints use `Depends(get_super_admin_user)`
+- `backend/app/core/permissions.py` — Grants `AUDIT_VIEW` to admin role
+
+**Decision needed:** Should tenant admins see their own tenant's audit logs?
+- If YES: Change endpoints to use `require_permission(Permission.AUDIT_VIEW)` and scope queries by tenant_id for non-super-admins
+- If NO: Remove `AUDIT_VIEW` from admin role permissions to keep the matrix consistent
+
+**Instructions for Boilerplate Claude (when ready to fix):**
+
+```
+ISSUE: Audit Log Permission Inconsistency
+
+The Permission enum has AUDIT_VIEW granted to both super_admin and admin roles
+in ROLE_PERMISSIONS, but the audit endpoints hardcode `get_super_admin_user`.
+
+TASK: Make audit endpoints permission-based instead of role-hardcoded.
+
+1. In `backend/app/api/v1/endpoints/audit.py`:
+   - Replace `Depends(get_super_admin_user)` with `Depends(require_permission(Permission.AUDIT_VIEW))`
+   - For non-super-admin users, automatically scope queries by their tenant_id
+   - Super admins can still filter by any tenant using query params
+
+2. Optionally add a tenant-scoped audit endpoint under the dashboard router
+   (e.g., GET /api/v1/audit/logs) so tenant admins have a natural access point,
+   separate from the admin-prefixed routes.
+
+3. Update the frontend to add an audit log viewer in the tenant dashboard
+   if tenant admins should see their own audit logs.
+
+4. Keep the admin/audit-logs endpoints working as before for super admins.
+```
+
+**Resolution:**
+- Changed all audit endpoints from `get_super_admin_user` to `require_permission(Permission.AUDIT_VIEW)`
+- Added `_apply_tenant_scope()` helper to scope queries by tenant for non-super-admins
+- Created tenant dashboard audit logs page at `/audit-logs`
+- Super admins can filter by any tenant; tenant admins see only their tenant's logs
 
 ---
 
 ### ~~ISSUE-003: Enhanced Developer Tools~~ → RESOLVED
 
-See Resolved Issues section below.
+**Classification:** Boilerplate
+**Severity:** Medium
+**Status:** RESOLVED
+**Date identified:** 2026-01-30
+**Date resolved:** 2026-02-04
+
+**Problem:**
+Developer tooling is minimal. The `/admin/tools` page only has seed and reset buttons. There is no runtime toggle for DEV_MODE, no log level control, no system info panel, and no way to clear audit logs for fresh testing. The dev toolbar (bottom bar) only shows auth state info.
+
+**Current state:**
+- `/admin/tools` — Seed data + reset database (2 buttons)
+- `/admin/logs` — Page missing (ISSUE-001), but once built it needs a clear/archive action
+- `DEV_MODE` — Env var only, requires server restart to change
+- Log level — Hardcoded to INFO in `main.py`, no runtime control
+- Dev toolbar — Shows user/role/tenant, no controls
+
+**Page arrangement:**
+
+`/admin/logs` (Audit Logs) — operational admin feature:
+- Audit log viewer (from ISSUE-001)
+- "Clear Audit Logs" button (dev mode only, hidden in production)
+- "Archive Audit Logs" button (available in production — moves old logs to archive table or exports)
+
+`/admin/tools` (Developer Tools) — dev infrastructure page:
+- **Database Tools** section (existing: seed, reset)
+- **Runtime Settings** section (new):
+  - DEV_MODE on/off toggle (affects rate limiting + dev features visibility)
+  - Log Level selector (DEBUG / INFO / WARNING / ERROR)
+  - Rate Limiting on/off toggle (independent of DEV_MODE)
+- **System Info** section (new):
+  - Health status (DB connected, Redis connected) — from existing `/health/detailed`
+  - Current Alembic migration version
+  - Python version, FastAPI version
+  - Active env config display (secrets masked)
+- **Request Logs** section (new):
+  - Live tail of recent entries from `logs/app.log`
+  - Filter by log level (ERROR / WARNING / INFO / DEBUG)
+  - Auto-refresh toggle
+
+**Affected files (boilerplate scope):**
+- `backend/app/api/v1/endpoints/admin_tools.py` — Add new endpoints
+- `backend/app/api/v1/endpoints/audit.py` — Add clear/archive endpoints
+- `frontend/src/app/(auth)/admin/tools/page.tsx` — Expand with new sections
+- `frontend/src/app/(auth)/admin/logs/page.tsx` — Add clear/archive buttons (after ISSUE-001)
+- `backend/app/config.py` — Support runtime settings override
+- `backend/app/main.py` — Dynamic log level
+
+**Dependencies:** ISSUE-001 should be completed first (audit logs page must exist before adding clear button to it).
+
+**Instructions for Boilerplate Claude:**
+
+```
+ISSUE: Enhanced Developer Tools
+
+The /admin/tools page only has seed and reset buttons. We need better developer tooling
+for runtime control, system visibility, and log management.
+
+TASK: Enhance developer tools in two pages.
+
+== PART A: Backend Endpoints ==
+
+1. Add to `backend/app/api/v1/endpoints/admin_tools.py` (all require super_admin):
+
+   a. POST /admin/tools/settings — Update runtime settings
+      - Accepts JSON: { "dev_mode": bool, "log_level": str, "rate_limit_enabled": bool }
+      - Stores in an in-memory runtime config that overrides env vars for the running process
+      - Updates loguru log level dynamically: logger.remove() + logger.add() with new level
+      - Updates settings.DEV_MODE and settings.RATE_LIMIT_ENABLED in memory
+      - Returns current settings state
+      - Audit log the change
+
+   b. GET /admin/tools/settings — Get current runtime settings
+      - Returns: { dev_mode, log_level, rate_limit_enabled }
+
+   c. GET /admin/tools/system-info — Get system information
+      - Python version, FastAPI version
+      - Database connection status (reuse health check logic)
+      - Redis connection status
+      - Current Alembic migration version (run `alembic current` or query alembic_version table)
+      - Server uptime
+      - Environment variables (mask SECRET_KEY, DATABASE_URL password, MAIL_PASSWORD, etc.)
+
+   d. GET /admin/tools/logs — Get recent application logs
+      - Query params: level (filter), limit (default 100), offset
+      - Reads from logs/app.log file, parses lines
+      - Returns array of { timestamp, level, message }
+
+2. Add to `backend/app/api/v1/endpoints/audit.py`:
+
+   a. DELETE /admin/audit-logs/ — Clear audit logs (dev mode only)
+      - Check settings.DEV_MODE is True, return 403 if not
+      - Delete all audit log records from database
+      - Audit log the clear action itself (meta — "audit logs cleared")
+      - Return count of deleted records
+
+   b. POST /admin/audit-logs/archive — Archive old audit logs
+      - Query param: before_date (default: 90 days ago)
+      - For now, just delete records older than the date (full archive table is future work)
+      - Return count of archived/deleted records
+      - Works in both dev and production mode
+
+== PART B: Frontend — Expand /admin/tools page ==
+
+3. Expand `frontend/src/app/(auth)/admin/tools/page.tsx` with three new sections
+   below the existing Database Tools section:
+
+   a. "Runtime Settings" card:
+      - DEV_MODE toggle switch (calls POST /admin/tools/settings)
+      - Log Level dropdown: DEBUG, INFO, WARNING, ERROR
+      - Rate Limiting toggle switch
+      - Each change calls the settings endpoint immediately
+      - Show current values on load (GET /admin/tools/settings)
+
+   b. "System Info" card:
+      - Display all fields from GET /admin/tools/system-info
+      - Color-coded status badges for DB and Redis (green=connected, red=disconnected)
+      - Show migration version
+      - Refresh button to re-fetch
+      - Env vars in a collapsible section (values masked by default, click to reveal)
+
+   c. "Request Logs" card:
+      - Table showing recent log entries from GET /admin/tools/logs
+      - Columns: timestamp, level (color-coded badge), message
+      - Level filter dropdown (show all, or filter by ERROR/WARNING/INFO/DEBUG)
+      - Limit selector (50, 100, 200)
+      - Auto-refresh checkbox (polls every 5 seconds when enabled)
+      - Scroll to bottom / scroll to top buttons
+
+   Follow existing patterns from the current seed/reset cards for styling.
+
+== PART C: Frontend — Add buttons to /admin/logs page ==
+
+4. After ISSUE-001 is done (audit logs page exists), add:
+   - "Clear All Logs" button (only visible when DEV_MODE is true)
+     - Confirmation dialog before clearing
+     - Calls DELETE /admin/audit-logs/
+     - Refreshes the log list after clearing
+   - "Archive Old Logs" button (always visible)
+     - Date picker for cutoff date (default: 90 days ago)
+     - Calls POST /admin/audit-logs/archive
+     - Shows count of archived records
+     - Refreshes the log list
+
+== IMPORTANT NOTES ==
+- Runtime settings are in-memory only. Server restart resets to env var values.
+  This is intentional — env vars are the source of truth, runtime is for quick toggling.
+- The clear audit logs endpoint MUST check DEV_MODE. Never allow clearing in production.
+- Mask sensitive env vars: any key containing SECRET, PASSWORD, KEY, TOKEN, or DATABASE_URL.
+- The log file reader should handle the case where logs/app.log doesn't exist yet.
+- All new endpoints need audit logging.
+```
+
+**Resolution:**
+- Added backend endpoints: `GET/POST /admin/tools/settings`, `GET /admin/tools/system-info`, `GET /admin/tools/logs`
+- Added `DELETE /admin/audit-logs/` (dev mode only) and `POST /admin/audit-logs/archive`
+- Expanded `/admin/tools` page with Runtime Settings, System Info, and Request Logs sections
+- Added clear/archive buttons to audit logs page
+- Created `frontend/src/lib/api/admin-tools.ts` and `frontend/src/lib/store/devModeStore.ts`
 
 ---
 
@@ -280,73 +1042,6 @@ TASK: Fix dark mode colors, rename sidebar item, group database tools, restyle d
 - The dev toolbar should ONLY render in development mode (NODE_ENV !== 'development')
 ```
 
----
-
-## Resolved Issues
-
-### ISSUE-001: Super Admin Cannot Access Audit Logs Page ✓
-**Resolved:** 2026-02-04
-
-**Problem:**
-The admin sidebar linked to `/admin/logs` but the page file was being ignored by `.gitignore` due to a broad `logs/` pattern that matched any directory named "logs".
-
-**Root cause:**
-The `.gitignore` had `logs/` on line 30 which matched `frontend/src/app/(auth)/admin/logs/` directory, causing the page to never be committed to git.
-
-**Fix:**
-1. Changed `.gitignore` pattern from `logs/` to `/logs/` (root-only)
-2. Added negation pattern `!frontend/src/app/**/logs/` to explicitly include admin logs pages
-3. Committed the previously-ignored `frontend/src/app/(auth)/admin/logs/page.tsx` file
-
-**Files modified:**
-- `.gitignore` — Fixed overly broad logs/ pattern
-- `frontend/src/app/(auth)/admin/logs/page.tsx` — Now tracked (was created but ignored)
-
----
-
-### ISSUE-002: Audit Log Permission Inconsistency ✓
-**Resolved:** 2026-01-30
-
-**Problem:**
-The permission matrix granted `AUDIT_VIEW` to both `super_admin` and `admin` roles, but the backend endpoints hardcoded `get_super_admin_user` dependency. Tenant admins couldn't view their own audit logs.
-
-**Fix:**
-1. Replaced `Depends(get_super_admin_user)` with `Depends(require_permission(Permission.AUDIT_VIEW))` on read endpoints
-2. Added `_apply_tenant_scope()` helper: non-super-admin users are automatically filtered to `current_user.tenant_id`; super admins retain full cross-tenant access
-3. Created tenant audit logs page at `/dashboard/audit-logs` with `tenantAuditAPI`
-4. Added conditional sidebar link based on `audit.view` permission
-5. Kept `clear` and `archive` endpoints as super-admin only (destructive operations)
-
-**Files modified:**
-- `backend/app/api/v1/endpoints/audit.py` — Permission-based auth with tenant scoping
-- `frontend/src/lib/api/audit.ts` — Added `tenantAuditAPI` export
-- `frontend/src/app/(dashboard)/audit-logs/page.tsx` — New tenant audit logs page
-- `frontend/src/app/(dashboard)/layout.tsx` — Conditional sidebar link
-
----
-
-### ISSUE-003: Enhanced Developer Tools ✓
-**Resolved:** 2026-02-04
-
-**Summary of implementation:**
-- `/admin/tools` page now has 4 sections: System Info, Runtime Settings, Request Logs, Database Tools
-- Backend endpoints: GET/POST `/admin/tools/settings`, GET `/admin/tools/system-info`, GET `/admin/tools/logs`
-- `/admin/logs` page has Clear (dev mode only) and Archive buttons with confirmation dialogs
-- Backend endpoints: DELETE `/admin/audit-logs/`, POST `/admin/audit-logs/archive`
-- Runtime settings are in-memory (reset on server restart)
-- Dev toolbar restyled as floating bottom-right panel with minimize/expand
-
-**Files modified:**
-- `backend/app/api/v1/endpoints/admin_tools.py` — Added settings, system-info, logs endpoints
-- `backend/app/api/v1/endpoints/audit.py` — Added clear and archive endpoints
-- `frontend/src/app/(auth)/admin/tools/page.tsx` — Full rebuild with 4 sections
-- `frontend/src/app/(auth)/admin/logs/page.tsx` — Added clear/archive UI
-- `frontend/src/lib/api/admin-tools.ts` — New API client
-- `frontend/src/lib/store/devModeStore.ts` — Zustand store for dev mode state
-- `frontend/src/components/dev/dev-toolbar.tsx` — Restyled floating panel
-
----
-
 ### ISSUE-005: React Hooks Order Violation in Developer Tools Page ✓
 **Resolved:** 2026-02-04
 
@@ -410,6 +1105,40 @@ Moved all hooks to the top of the component before any conditional returns:
   - `backend/app/models/__init__.py` (business model imports added)
   - `backend/app/api/v1/__init__.py` (business routers added)
   - `frontend/src/hooks/use-permission.ts` (business permissions added)
-  - `frontend/src/app/(dashboard)/layout.tsx` (master data nav added)
+  - `frontend/src/app/(dashboard)/layout.tsx` (master data nav added) → **After ISSUE-006, this becomes `DashboardLayoutClient.tsx`**
   - `backend/alembic/env.py` (business model imports added)
 - These are the only files that overlap between boilerplate and business features
+
+### ISSUE-006 Boilerplate Pull Checklist
+
+When pulling boilerplate updates after ISSUE-006 is applied:
+
+1. **New files from boilerplate** (no conflicts expected):
+   - `frontend/src/app/(auth)/admin/AdminLayoutClient.tsx`
+   - `frontend/src/app/(auth)/admin/logs/AuditLogsClient.tsx`
+   - `frontend/src/app/(dashboard)/DashboardLayoutClient.tsx`
+   - `frontend/src/app/NotFoundClient.tsx`
+
+2. **Files that will conflict** (Harmony has local changes):
+   - `frontend/src/app/(dashboard)/layout.tsx` - Accept boilerplate's server component wrapper
+   - After accepting, ensure `DashboardLayoutClient.tsx` includes Harmony's `masterDataNav` and `posNav` arrays
+
+3. **Manual merge needed for `DashboardLayoutClient.tsx`**:
+   Add these navigation arrays that are Harmony-specific:
+   ```tsx
+   const posNav = [
+     { name: 'Point of Sale', href: '/pos', icon: ShoppingCart },
+     { name: 'Shifts', href: '/pos/shifts', icon: Clock },
+   ];
+
+   const masterDataNav = [
+     { name: 'Items', href: '/master/items', icon: Package },
+     { name: 'Categories', href: '/master/categories', icon: FolderTree },
+     { name: 'Units', href: '/master/units', icon: Ruler },
+     { name: 'Warehouses', href: '/master/warehouses', icon: Warehouse },
+     { name: 'Suppliers', href: '/master/suppliers', icon: Truck },
+     { name: 'Customers', href: '/master/customers', icon: UserCircle },
+     { name: 'Price Levels', href: '/master/price-levels', icon: Tags },
+   ];
+   ```
+   And add the corresponding nav sections in the sidebar JSX.

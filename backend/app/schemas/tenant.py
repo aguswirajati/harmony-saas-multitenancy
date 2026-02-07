@@ -3,9 +3,42 @@ Tenant Schemas for Phase 6A - Tenant Management
 Comprehensive request/response models for tenant operations
 """
 from pydantic import BaseModel, EmailStr, Field, validator
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from uuid import UUID
+
+
+# ============================================================================
+# FORMAT SETTINGS (Regional Preferences)
+# ============================================================================
+
+class FormatSettings(BaseModel):
+    """Tenant-level format settings for currency, numbers, and dates"""
+    currency_code: str = Field(default="IDR", description="ISO currency code")
+    currency_symbol_position: Literal["before", "after"] = Field(
+        default="before",
+        description="Currency symbol position (Rp 1.000 vs 1.000 Rp)"
+    )
+    decimal_separator: str = Field(default=",", description="Decimal separator")
+    thousands_separator: str = Field(default=".", description="Thousands separator")
+    price_decimal_places: int = Field(default=0, ge=0, le=4, description="Decimal places for prices")
+    quantity_decimal_places: int = Field(default=0, ge=0, le=4, description="Decimal places for quantities")
+    date_format: str = Field(default="DD/MM/YYYY", description="Date display format")
+    timezone: str = Field(default="Asia/Jakarta", description="Tenant timezone")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "currency_code": "IDR",
+                "currency_symbol_position": "before",
+                "decimal_separator": ",",
+                "thousands_separator": ".",
+                "price_decimal_places": 0,
+                "quantity_decimal_places": 0,
+                "date_format": "DD/MM/YYYY",
+                "timezone": "Asia/Jakarta"
+            }
+        }
 
 
 # ============================================================================

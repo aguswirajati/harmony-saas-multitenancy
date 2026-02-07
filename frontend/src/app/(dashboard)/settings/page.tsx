@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -18,7 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Building2, Users, HardDrive, Check, Loader2, Save } from 'lucide-react';
+import { Building2, Users, HardDrive, Check, Loader2, Save, Globe, DollarSign, Calendar, Hash } from 'lucide-react';
+import {
+  FormatSettings,
+  DEFAULT_FORMAT_SETTINGS,
+  getFormatPreview,
+  CURRENCY_OPTIONS,
+  DATE_FORMAT_OPTIONS,
+  TIMEZONE_OPTIONS,
+} from '@/lib/utils/format';
 
 interface TenantInfo {
   id: string;
@@ -30,7 +38,7 @@ interface TenantInfo {
   max_users: number;
   max_branches: number;
   max_storage_gb: number;
-  settings: Record<string, string>;
+  settings: Record<string, any>;
 }
 
 interface UsageData {
@@ -98,10 +106,13 @@ export default function SettingsPage() {
   const [tenantInfo, setTenantInfo] = useState<TenantInfo | null>(null);
   const [formName, setFormName] = useState('');
   const [formLogoUrl, setFormLogoUrl] = useState('');
-  const [formTimezone, setFormTimezone] = useState('Asia/Jakarta');
   const [formLanguage, setFormLanguage] = useState('id');
-  const [formCurrency, setFormCurrency] = useState('IDR');
-  const [formDateFormat, setFormDateFormat] = useState('DD/MM/YYYY');
+
+  // Format settings state
+  const [formatSettings, setFormatSettings] = useState<FormatSettings>(DEFAULT_FORMAT_SETTINGS);
+  const [formatSaving, setFormatSaving] = useState(false);
+  const [formatSaveSuccess, setFormatSaveSuccess] = useState(false);
+  const [formatError, setFormatError] = useState<string | null>(null);
 
   // Subscription state
   const [usage, setUsage] = useState<UsageData | null>(null);
@@ -115,23 +126,22 @@ export default function SettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [tenantData, usageData, tiersData] = await Promise.all([
+      const [tenantData, usageData, tiersData, formatData] = await Promise.all([
         apiClient.get<TenantInfo>('/tenant-settings/'),
         apiClient.get<UsageData>('/tenant-settings/usage'),
         apiClient.get<AvailableTiers>('/tenant-settings/tiers'),
+        apiClient.get<FormatSettings>('/tenant-settings/format'),
       ]);
 
       setTenantInfo(tenantData);
       setUsage(usageData);
       setTiers(tiersData);
+      setFormatSettings(formatData);
 
       // Populate form
       setFormName(tenantData.name);
       setFormLogoUrl(tenantData.logo_url || '');
-      setFormTimezone(tenantData.settings?.timezone || 'Asia/Jakarta');
       setFormLanguage(tenantData.settings?.language || 'id');
-      setFormCurrency(tenantData.settings?.currency || 'IDR');
-      setFormDateFormat(tenantData.settings?.date_format || 'DD/MM/YYYY');
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to load settings');
     } finally {
@@ -148,10 +158,8 @@ export default function SettingsPage() {
         name: formName,
         logo_url: formLogoUrl || null,
         settings: {
-          timezone: formTimezone,
+          ...tenantInfo?.settings,
           language: formLanguage,
-          currency: formCurrency,
-          date_format: formDateFormat,
         },
       });
       setTenantInfo(updated);
@@ -163,6 +171,31 @@ export default function SettingsPage() {
       setSaving(false);
     }
   };
+
+  const handleFormatSave = async () => {
+    setFormatSaving(true);
+    setFormatSaveSuccess(false);
+    setFormatError(null);
+    try {
+      const updated = await apiClient.put<FormatSettings>('/tenant-settings/format', formatSettings);
+      setFormatSettings(updated);
+      setFormatSaveSuccess(true);
+      setTimeout(() => setFormatSaveSuccess(false), 3000);
+    } catch (err: any) {
+      setFormatError(err?.response?.data?.detail || 'Failed to save format settings');
+    } finally {
+      setFormatSaving(false);
+    }
+  };
+
+  const updateFormatSetting = <K extends keyof FormatSettings>(
+    key: K,
+    value: FormatSettings[K]
+  ) => {
+    setFormatSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const preview = getFormatPreview(formatSettings);
 
   if (loading) {
     return (
@@ -180,7 +213,7 @@ export default function SettingsPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-md">
           {error}
         </div>
       )}
@@ -188,6 +221,7 @@ export default function SettingsPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="organization">Organization</TabsTrigger>
+          <TabsTrigger value="format">Format Settings</TabsTrigger>
           <TabsTrigger value="subscription">Subscription</TabsTrigger>
         </TabsList>
 
@@ -239,29 +273,6 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Select
-                    value={formTimezone}
-                    onValueChange={setFormTimezone}
-                    disabled={!isAdmin}
-                  >
-                    <SelectTrigger id="timezone">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Asia/Jakarta">Asia/Jakarta (WIB)</SelectItem>
-                      <SelectItem value="Asia/Makassar">Asia/Makassar (WITA)</SelectItem>
-                      <SelectItem value="Asia/Jayapura">Asia/Jayapura (WIT)</SelectItem>
-                      <SelectItem value="Asia/Singapore">Asia/Singapore</SelectItem>
-                      <SelectItem value="Asia/Tokyo">Asia/Tokyo</SelectItem>
-                      <SelectItem value="America/New_York">America/New York</SelectItem>
-                      <SelectItem value="America/Los_Angeles">America/Los Angeles</SelectItem>
-                      <SelectItem value="Europe/London">Europe/London</SelectItem>
-                      <SelectItem value="UTC">UTC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="language">Language</Label>
                   <Select
                     value={formLanguage}
@@ -279,46 +290,267 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Format Settings Tab */}
+        <TabsContent value="format" className="mt-6 space-y-6">
+          {formatError && (
+            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-md">
+              {formatError}
+            </div>
+          )}
+
+          {/* Preview Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Format Preview
+              </CardTitle>
+              <CardDescription>
+                See how values will be displayed with your current settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Currency</p>
+                  <p className="text-lg font-semibold">{preview.currency}</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Number</p>
+                  <p className="text-lg font-semibold">{preview.number}</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Date</p>
+                  <p className="text-lg font-semibold">{preview.date}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Currency Settings */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Currency Settings
+                </CardTitle>
+                <CardDescription>
+                  Configure how currency values are displayed
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
+                  <Label>Currency Code</Label>
                   <Select
-                    value={formCurrency}
-                    onValueChange={setFormCurrency}
+                    value={formatSettings.currency_code}
+                    onValueChange={(v) => updateFormatSetting('currency_code', v)}
                     disabled={!isAdmin}
                   >
-                    <SelectTrigger id="currency">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="IDR">IDR - Indonesian Rupiah</SelectItem>
-                      <SelectItem value="USD">USD - US Dollar</SelectItem>
-                      <SelectItem value="EUR">EUR - Euro</SelectItem>
-                      <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                      <SelectItem value="SGD">SGD - Singapore Dollar</SelectItem>
-                      <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
+                      {CURRENCY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="date_format">Date Format</Label>
+                  <Label>Symbol Position</Label>
+                  <RadioGroup
+                    value={formatSettings.currency_symbol_position}
+                    onValueChange={(v) => updateFormatSetting('currency_symbol_position', v as 'before' | 'after')}
+                    disabled={!isAdmin}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="before" id="pos-before" />
+                      <Label htmlFor="pos-before" className="font-normal">Before (Rp 1.000)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="after" id="pos-after" />
+                      <Label htmlFor="pos-after" className="font-normal">After (1.000 Rp)</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Price Decimal Places</Label>
                   <Select
-                    value={formDateFormat}
-                    onValueChange={setFormDateFormat}
+                    value={String(formatSettings.price_decimal_places)}
+                    onValueChange={(v) => updateFormatSetting('price_decimal_places', parseInt(v))}
                     disabled={!isAdmin}
                   >
-                    <SelectTrigger id="date_format">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                      <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                      <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                      <SelectItem value="0">0 (1.000)</SelectItem>
+                      <SelectItem value="1">1 (1.000,0)</SelectItem>
+                      <SelectItem value="2">2 (1.000,00)</SelectItem>
+                      <SelectItem value="3">3 (1.000,000)</SelectItem>
+                      <SelectItem value="4">4 (1.000,0000)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Number Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Hash className="h-5 w-5" />
+                Number Format
+              </CardTitle>
+              <CardDescription>
+                Configure decimal and thousands separators
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label>Decimal Separator</Label>
+                  <Select
+                    value={formatSettings.decimal_separator}
+                    onValueChange={(v) => updateFormatSetting('decimal_separator', v)}
+                    disabled={!isAdmin}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=",">Comma (,)</SelectItem>
+                      <SelectItem value=".">Period (.)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Thousands Separator</Label>
+                  <Select
+                    value={formatSettings.thousands_separator}
+                    onValueChange={(v) => updateFormatSetting('thousands_separator', v)}
+                    disabled={!isAdmin}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=".">Period (.)</SelectItem>
+                      <SelectItem value=",">Comma (,)</SelectItem>
+                      <SelectItem value=" ">Space</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Quantity Decimal Places</Label>
+                  <Select
+                    value={String(formatSettings.quantity_decimal_places)}
+                    onValueChange={(v) => updateFormatSetting('quantity_decimal_places', parseInt(v))}
+                    disabled={!isAdmin}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0 (1.234)</SelectItem>
+                      <SelectItem value="1">1 (1.234,5)</SelectItem>
+                      <SelectItem value="2">2 (1.234,56)</SelectItem>
+                      <SelectItem value="3">3 (1.234,567)</SelectItem>
+                      <SelectItem value="4">4 (1.234,5678)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Date & Time Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Date & Time
+              </CardTitle>
+              <CardDescription>
+                Configure date format and timezone
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>Date Format</Label>
+                  <Select
+                    value={formatSettings.date_format}
+                    onValueChange={(v) => updateFormatSetting('date_format', v)}
+                    disabled={!isAdmin}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATE_FORMAT_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label} ({opt.example})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Timezone</Label>
+                  <Select
+                    value={formatSettings.timezone}
+                    onValueChange={(v) => updateFormatSetting('timezone', v)}
+                    disabled={!isAdmin}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEZONE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save Button */}
+          {isAdmin && (
+            <div className="flex justify-end">
+              <Button onClick={handleFormatSave} disabled={formatSaving} size="lg">
+                {formatSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : formatSaveSuccess ? (
+                  <Check className="h-4 w-4 mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                {formatSaveSuccess ? 'Saved' : 'Save Format Settings'}
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         {/* Subscription Tab */}
@@ -329,8 +561,8 @@ export default function SettingsPage() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Users className="h-5 w-5 text-blue-600" />
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                      <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Users</p>
@@ -361,8 +593,8 @@ export default function SettingsPage() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Building2 className="h-5 w-5 text-green-600" />
+                    <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                      <Building2 className="h-5 w-5 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Branches</p>
@@ -393,8 +625,8 @@ export default function SettingsPage() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <HardDrive className="h-5 w-5 text-purple-600" />
+                    <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                      <HardDrive className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Storage</p>
