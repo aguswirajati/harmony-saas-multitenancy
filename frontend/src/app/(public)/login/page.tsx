@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Home } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -79,6 +79,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
+          <div className="flex justify-center mb-2">
+            <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+              <Home className="h-5 w-5" />
+              <span className="sr-only">Home</span>
+            </Link>
+          </div>
           <CardTitle className="text-2xl font-bold text-center">
             Welcome Back
           </CardTitle>

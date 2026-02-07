@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Home } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -58,9 +58,15 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
+          <div className="flex justify-center mb-2">
+            <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+              <Home className="h-5 w-5" />
+              <span className="sr-only">Home</span>
+            </Link>
+          </div>
           <CardTitle className="text-2xl font-bold text-center">
             Create Account
           </CardTitle>
@@ -106,9 +112,9 @@ export default function RegisterPage() {
                   pattern="[a-z0-9-]+"
                   minLength={3}
                 />
-                <span className="text-sm text-gray-500">.yourdomain.com</span>
+                <span className="text-sm text-muted-foreground">.yourdomain.com</span>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Lowercase letters, numbers, and hyphens only
               </p>
             </div>
@@ -158,7 +164,7 @@ export default function RegisterPage() {
                     minLength={8}
                     disabled={isLoading}
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Minimum 8 characters
                   </p>
                 </div>
@@ -183,7 +189,7 @@ export default function RegisterPage() {
         </CardContent>
 
         <CardFooter>
-          <div className="text-sm text-center w-full text-gray-600">
+          <div className="text-sm text-center w-full text-muted-foreground">
             Already have an account?{' '}
             <Link href="/login" className="text-blue-600 hover:underline font-medium">
               Login here
