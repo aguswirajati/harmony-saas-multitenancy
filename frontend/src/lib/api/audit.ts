@@ -7,7 +7,7 @@ export interface AuditLog {
   action: string;
   resource: string;
   resource_id: string | null;
-  details: Record<string, any> | null;
+  details: Record<string, unknown> | null;
   status: string;
   ip_address: string | null;
   user_agent: string | null;

@@ -179,8 +179,34 @@ class AuditAction:
     # Settings
     SETTINGS_UPDATED = "settings.updated"
 
+    # File management
+    FILE_UPLOADED = "file.uploaded"
+    FILE_DELETED = "file.deleted"
+    FILE_UPDATED = "file.updated"
+    TENANT_LOGO_UPLOADED = "tenant.logo_uploaded"
+    TENANT_LOGO_DELETED = "tenant.logo_deleted"
+    USER_AVATAR_UPLOADED = "user.avatar_uploaded"
+    USER_AVATAR_DELETED = "user.avatar_deleted"
+
     # System
     SYSTEM_ERROR = "system.error"
+
+    # Subscription Tiers
+    TIER_CREATED = "tier.created"
+    TIER_UPDATED = "tier.updated"
+    TIER_DELETED = "tier.deleted"
+
+    # Payment Methods
+    PAYMENT_METHOD_CREATED = "payment_method.created"
+    PAYMENT_METHOD_UPDATED = "payment_method.updated"
+    PAYMENT_METHOD_DELETED = "payment_method.deleted"
+
+    # Upgrade Requests
+    UPGRADE_REQUESTED = "upgrade.requested"
+    UPGRADE_PROOF_UPLOADED = "upgrade.proof_uploaded"
+    UPGRADE_APPROVED = "upgrade.approved"
+    UPGRADE_REJECTED = "upgrade.rejected"
+    UPGRADE_CANCELLED = "upgrade.cancelled"
 
 
 # Status constants

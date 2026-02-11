@@ -33,8 +33,9 @@ export function EmailVerificationBanner() {
       setTimeout(() => {
         setResent(false);
       }, 5000);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to resend verification email');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      setError(axiosError.response?.data?.detail || 'Failed to resend verification email');
     } finally {
       setIsResending(false);
     }

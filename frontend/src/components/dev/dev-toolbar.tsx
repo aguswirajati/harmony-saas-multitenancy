@@ -11,8 +11,8 @@ export function DevToolbar() {
   const [expanded, setExpanded] = useState(false);
   const [minimized, setMinimized] = useState(false);
 
-  // Only show when dev mode is enabled and user is logged in
-  if (!devMode || !user) {
+  // Only show when dev mode is enabled and user is super_admin
+  if (!devMode || !user || user.role !== 'super_admin') {
     return null;
   }
 

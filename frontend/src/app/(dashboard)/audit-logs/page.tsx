@@ -2,7 +2,7 @@
 
 import { useState, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { tenantAuditAPI, AuditLog } from '@/lib/api/audit';
+import { tenantAuditAPI } from '@/lib/api/audit';
 import {
   Table,
   TableBody,
@@ -114,7 +114,7 @@ export default function TenantAuditLogsPage() {
         );
       default:
         return (
-          <Badge variant="outline" className="bg-gray-100 text-gray-800">
+          <Badge variant="outline" className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
             {status}
           </Badge>
         );
@@ -127,6 +127,7 @@ export default function TenantAuditLogsPage() {
     if (action.startsWith('user.')) return 'User';
     if (action.startsWith('branch.')) return 'Branch';
     if (action.startsWith('settings.')) return 'Settings';
+    if (action.startsWith('file.')) return 'Files';
     if (action.startsWith('system.')) return 'System';
     return 'Other';
   };
@@ -247,12 +248,12 @@ export default function TenantAuditLogsPage() {
                   variant="outline"
                   className={
                     status === 'success'
-                      ? 'bg-green-100 text-green-800 border-green-300'
+                      ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
                       : status === 'failure'
-                        ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                        ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
                         : status === 'error'
-                          ? 'bg-red-100 text-red-800 border-red-300'
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
                   }
                 >
                   {status}: {count}

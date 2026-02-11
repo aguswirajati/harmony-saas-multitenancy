@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Home } from 'lucide-react';
+import { Loader2, Home, Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function RegisterPage() {
     admin_password: '',
     admin_name: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -37,9 +38,12 @@ export default function RegisterPage() {
     try {
       await register(formData);
       router.push('/dashboard');
-    } catch (error) {
-      // Error handled by store
+    } catch (error: unknown) {
+      // Error handled by store, but log details for debugging
+      const axiosError = error as { response?: { data?: unknown; status?: number } };
       console.error('Register error:', error);
+      console.error('Response data:', axiosError.response?.data);
+      console.error('Response status:', axiosError.response?.status);
     }
   };
 
@@ -109,7 +113,7 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  pattern="[a-z0-9-]+"
+                  pattern="[a-z0-9\-]+"
                   minLength={3}
                 />
                 <span className="text-sm text-muted-foreground">.yourdomain.com</span>
@@ -153,19 +157,30 @@ export default function RegisterPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="admin_password">Password</Label>
-                  <Input
-                    id="admin_password"
-                    name="admin_password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.admin_password}
-                    onChange={handleChange}
-                    required
-                    minLength={8}
-                    disabled={isLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="admin_password"
+                      name="admin_password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={formData.admin_password}
+                      onChange={handleChange}
+                      required
+                      minLength={8}
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Minimum 8 characters
+                    Minimum 8 characters with uppercase, lowercase, and number
                   </p>
                 </div>
               </div>

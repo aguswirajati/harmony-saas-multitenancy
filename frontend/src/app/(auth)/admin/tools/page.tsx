@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import { adminToolsAPI, RuntimeSettings, LogEntry } from '@/lib/api/admin-tools';
+import { adminToolsAPI, RuntimeSettings } from '@/lib/api/admin-tools';
 import { useDevModeStore } from '@/lib/store/devModeStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -227,11 +227,11 @@ export default function AdminToolsPage() {
       case 'CRITICAL':
         return <Badge variant="destructive">{upper}</Badge>;
       case 'WARNING':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">{upper}</Badge>;
+        return <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">{upper}</Badge>;
       case 'INFO':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">{upper}</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700">{upper}</Badge>;
       case 'DEBUG':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">{upper}</Badge>;
+        return <Badge variant="outline" className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">{upper}</Badge>;
       default:
         return <Badge variant="outline">{upper}</Badge>;
     }
@@ -239,7 +239,7 @@ export default function AdminToolsPage() {
 
   const getStatusBadge = (status: string) => {
     if (status.startsWith('connected') || status === 'healthy') {
-      return <Badge className="bg-green-100 text-green-800 border-green-300">{status}</Badge>;
+      return <Badge className="bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">{status}</Badge>;
     }
     if (status.startsWith('disconnected') || status.startsWith('unhealthy')) {
       return <Badge variant="destructive">{status}</Badge>;

@@ -2,7 +2,7 @@
 
 import { useState, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { auditAPI, AuditLog } from '@/lib/api/audit';
+import { auditAPI } from '@/lib/api/audit';
 import { adminToolsAPI } from '@/lib/api/admin-tools';
 import {
   Table,
@@ -50,7 +50,7 @@ import {
   Loader2,
   CalendarDays,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatDistanceToNow, format, subDays } from 'date-fns';
 
@@ -173,7 +173,7 @@ export default function AuditLogsClient() {
         );
       default:
         return (
-          <Badge variant="outline" className="bg-gray-100 text-gray-800">
+          <Badge variant="outline" className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
             {status}
           </Badge>
         );
@@ -338,12 +338,12 @@ export default function AuditLogsClient() {
                   variant="outline"
                   className={
                     status === 'success'
-                      ? 'bg-green-100 text-green-800 border-green-300'
+                      ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
                       : status === 'failure'
-                        ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                        ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
                         : status === 'error'
-                          ? 'bg-red-100 text-red-800 border-red-300'
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
                   }
                 >
                   {status}: {count}

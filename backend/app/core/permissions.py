@@ -33,6 +33,11 @@ class Permission(str, Enum):
     DASHBOARD_VIEW = "dashboard.view"
     STATS_VIEW = "stats.view"
 
+    # Files
+    FILES_VIEW = "files.view"
+    FILES_UPLOAD = "files.upload"
+    FILES_DELETE = "files.delete"
+
 
 # Role -> set of permissions mapping
 ROLE_PERMISSIONS: dict[str, set[Permission]] = {
@@ -54,12 +59,17 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
         Permission.AUDIT_VIEW,
         Permission.DASHBOARD_VIEW,
         Permission.STATS_VIEW,
+        Permission.FILES_VIEW,
+        Permission.FILES_UPLOAD,
+        Permission.FILES_DELETE,
     },
 
     "staff": {
         Permission.USERS_VIEW,
         Permission.BRANCHES_VIEW,
         Permission.DASHBOARD_VIEW,
+        Permission.FILES_VIEW,
+        Permission.FILES_UPLOAD,
     },
 }
 

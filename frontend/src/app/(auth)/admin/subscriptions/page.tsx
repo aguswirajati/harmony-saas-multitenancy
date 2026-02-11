@@ -66,10 +66,10 @@ interface SystemStats {
 }
 
 const TIER_CONFIGS = {
-  free: { max_users: 5, max_branches: 1, max_storage_gb: 1, color: 'bg-gray-100 border-gray-300 text-gray-800' },
-  basic: { max_users: 20, max_branches: 5, max_storage_gb: 10, color: 'bg-green-100 border-green-300 text-green-800' },
-  premium: { max_users: 100, max_branches: 20, max_storage_gb: 50, color: 'bg-blue-100 border-blue-300 text-blue-800' },
-  enterprise: { max_users: -1, max_branches: -1, max_storage_gb: 200, color: 'bg-purple-100 border-purple-300 text-purple-800' },
+  free: { max_users: 5, max_branches: 1, max_storage_gb: 1, color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
+  basic: { max_users: 20, max_branches: 5, max_storage_gb: 10, color: 'bg-green-100 dark:bg-green-900/50 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200' },
+  premium: { max_users: 100, max_branches: 20, max_storage_gb: 50, color: 'bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
+  enterprise: { max_users: -1, max_branches: -1, max_storage_gb: 200, color: 'bg-purple-100 dark:bg-purple-900/50 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
 };
 
 const TIERS = ['free', 'basic', 'premium', 'enterprise'] as const;
@@ -107,7 +107,7 @@ export default function SubscriptionsPage() {
       toast.success('Tenant tier updated successfully');
       setUpdatingTenantId(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error & { message?: string }) => {
       toast.error(error.message || 'Failed to update tier');
       setUpdatingTenantId(null);
     },
@@ -118,17 +118,13 @@ export default function SubscriptionsPage() {
     updateTierMutation.mutate({ tenantId, tier: newTier });
   };
 
-  const getTierColor = (tier: string) => {
-    return TIER_CONFIGS[tier as keyof typeof TIER_CONFIGS]?.color || 'bg-gray-100 border-gray-300 text-gray-800';
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-300';
-      case 'trial': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'expired': return 'bg-red-100 text-red-800 border-red-300';
-      case 'suspended': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'active': return 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700';
+      case 'trial': return 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700';
+      case 'expired': return 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700';
+      case 'suspended': return 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700';
+      default: return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
     }
   };
 

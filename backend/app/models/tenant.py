@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, JSON, DateTime, Boolean
+from sqlalchemy import Column, String, Integer, BigInteger, JSON, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -30,6 +30,10 @@ class Tenant(Base, BaseModel):
     meta_data = Column(JSON, default={})
 
     logo_url = Column(String, nullable=True)
+
+    # Storage tracking
+    storage_used_bytes = Column(BigInteger, default=0, nullable=False,
+                               comment="Current storage usage in bytes")
 
     # Relationships
     branches = relationship("Branch", back_populates="tenant", cascade="all, delete-orphan")

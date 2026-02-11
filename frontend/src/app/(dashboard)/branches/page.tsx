@@ -113,7 +113,7 @@ export default function BranchesPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Branches</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your organization's branch locations
+            Manage your organization&apos;s branch locations
           </p>
         </div>
         <Button onClick={handleCreate}>

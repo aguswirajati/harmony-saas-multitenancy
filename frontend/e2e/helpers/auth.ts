@@ -77,7 +77,7 @@ export async function clearAuthState(page: Page) {
     try {
       localStorage.clear();
       sessionStorage.clear();
-    } catch (e) {
+    } catch {
       // Ignore errors on about:blank
     }
   });

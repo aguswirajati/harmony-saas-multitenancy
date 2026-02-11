@@ -24,8 +24,9 @@ export default function ForgotPasswordPage() {
     try {
       await apiClient.post('/auth/forgot-password', { email });
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to send reset email. Please try again.');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      setError(axiosError.response?.data?.detail || 'Failed to send reset email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -45,14 +46,14 @@ export default function ForgotPasswordPage() {
               Check Your Email
             </CardTitle>
             <CardDescription>
-              We've sent password reset instructions to <strong>{email}</strong>
+              We&apos;ve sent password reset instructions to <strong>{email}</strong>
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-900">
-                If you don't see the email in a few minutes, check your spam folder.
+                If you don&apos;t see the email in a few minutes, check your spam folder.
                 The reset link will expire in 1 hour.
               </p>
             </div>
@@ -79,7 +80,7 @@ export default function ForgotPasswordPage() {
             Forgot Password?
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your email address and we'll send you a link to reset your password
+            Enter your email address and we&apos;ll send you a link to reset your password
           </CardDescription>
         </CardHeader>
 

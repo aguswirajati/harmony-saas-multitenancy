@@ -97,10 +97,10 @@ class TenantUpdate(BaseModel):
 class TenantSubscriptionUpdate(BaseModel):
     """Schema for updating subscription (Super Admin only)"""
     tier: str = Field(..., description="Subscription tier")
-    subscription_status: str = Field(default="active", description="Subscription status")
-    max_users: int = Field(..., ge=-1, description="Maximum users (-1 for unlimited)")
-    max_branches: int = Field(..., ge=-1, description="Maximum branches (-1 for unlimited)")
-    max_storage_gb: int = Field(..., ge=-1, description="Storage limit in GB (-1 for unlimited)")
+    subscription_status: Optional[str] = Field(None, description="Subscription status")
+    max_users: Optional[int] = Field(None, ge=-1, description="Maximum users (-1 for unlimited)")
+    max_branches: Optional[int] = Field(None, ge=-1, description="Maximum branches (-1 for unlimited)")
+    max_storage_gb: Optional[int] = Field(None, ge=-1, description="Storage limit in GB (-1 for unlimited)")
     trial_ends_at: Optional[datetime] = None
     subscription_ends_at: Optional[datetime] = None
 
@@ -113,6 +113,8 @@ class TenantSubscriptionUpdate(BaseModel):
 
     @validator('subscription_status')
     def valid_status(cls, v):
+        if v is None:
+            return v
         allowed = ['active', 'trial', 'expired', 'cancelled', 'suspended']
         if v not in allowed:
             raise ValueError(f'Status must be one of: {", ".join(allowed)}')

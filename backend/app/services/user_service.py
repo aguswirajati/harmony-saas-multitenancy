@@ -204,19 +204,29 @@ class UserService:
         # Track role change for audit
         role_changed = user_data.role and user_data.role != user.role
 
-        # Update fields
+        # Update fields - use exclude_unset to only update provided fields
+        # exclude_none=False so that null values can clear fields
         update_data = user_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(user, field, value)
 
-        # Update full name if first/last name changed
-        if user_data.first_name or user_data.last_name:
-            first = user_data.first_name or user.first_name
-            last = user_data.last_name or user.last_name
+        # Update full name based on current first/last name values
+        # Check if first_name or last_name was explicitly sent (even if null)
+        first_name_sent = 'first_name' in update_data
+        last_name_sent = 'last_name' in update_data
+
+        if first_name_sent or last_name_sent:
+            # Use the new value if sent, otherwise keep existing
+            first = user.first_name  # Already updated by setattr above
+            last = user.last_name    # Already updated by setattr above
             if first and last:
                 user.full_name = f"{first} {last}"
             elif first:
                 user.full_name = first
+            elif last:
+                user.full_name = last
+            else:
+                user.full_name = None
 
         user.updated_at = datetime.utcnow()
 

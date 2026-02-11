@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { userAPI } from '@/lib/api/users';
 import { UserWithBranch, UserCreate, UserUpdate } from '@/types/user';
 import { Branch } from '@/types/branch';
@@ -12,6 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +34,8 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
+import { AvatarUpload } from '@/components/features/files/AvatarUpload';
+import { toast } from 'sonner';
 
 interface UserDialogProps {
   open: boolean;
@@ -36,6 +48,7 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
   const isEdit = !!user;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const [formData, setFormData] = useState<UserCreate>({
     email: '',
@@ -47,31 +60,49 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
     default_branch_id: '',
   });
 
+  // Track initial values to detect changes
+  const [initialData, setInitialData] = useState<UserCreate | null>(null);
+
+  // Check if form has unsaved changes
+  const isDirty = useMemo(() => {
+    if (!initialData) return false;
+    return (
+      formData.first_name !== initialData.first_name ||
+      formData.last_name !== initialData.last_name ||
+      formData.phone !== initialData.phone ||
+      formData.role !== initialData.role ||
+      formData.default_branch_id !== initialData.default_branch_id ||
+      (!isEdit && formData.email !== initialData.email) ||
+      (!isEdit && formData.password !== initialData.password)
+    );
+  }, [formData, initialData, isEdit]);
+
   // Populate form when editing
   useEffect(() => {
-    if (user) {
-      setFormData({
-        email: user.email,
-        password: '', // Don't populate password for edit
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        phone: user.phone || '',
-        role: user.role,
-        default_branch_id: user.default_branch_id || '',
-      });
-    } else {
-      // Reset form for create
-      setFormData({
-        email: '',
-        password: '',
-        first_name: '',
-        last_name: '',
-        phone: '',
-        role: 'staff',
-        default_branch_id: 'No_Branch',
-      });
+    if (open) {
+      const data: UserCreate = user
+        ? {
+            email: user.email,
+            password: '',
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            phone: user.phone || '',
+            role: user.role,
+            default_branch_id: user.default_branch_id || '',
+          }
+        : {
+            email: '',
+            password: '',
+            first_name: '',
+            last_name: '',
+            phone: '',
+            role: 'staff',
+            default_branch_id: 'No_Branch',
+          };
+      setFormData(data);
+      setInitialData(data);
+      setError(null);
     }
-    setError(null);
   }, [user, open]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,13 +127,13 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
 
     try {
       if (isEdit) {
-        // For edit, don't send password if empty
+        // For edit, send null for empty strings to clear fields
         const updateData: UserUpdate = {
-          first_name: formData.first_name || undefined,
-          last_name: formData.last_name || undefined,
-          phone: formData.phone || undefined,
+          first_name: formData.first_name || null,
+          last_name: formData.last_name || null,
+          phone: formData.phone || null,
           role: formData.role,
-          default_branch_id: formData.default_branch_id || undefined,
+          default_branch_id: formData.default_branch_id || null,
         };
         await userAPI.update(user.id, updateData);
       } else {
@@ -120,8 +151,9 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
         await userAPI.create(formData);
       }
       onClose(true); // Success
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      const errorMessage = axiosError.response?.data?.detail ||
         `Failed to ${isEdit ? 'update' : 'create'} user`;
       setError(errorMessage);
     } finally {
@@ -129,203 +161,267 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
     }
   };
 
+  // Handle dialog close with unsaved changes check
+  const handleOpenChange = useCallback((newOpen: boolean) => {
+    if (!newOpen && isDirty) {
+      setShowDiscardDialog(true);
+    } else if (!newOpen) {
+      onClose();
+    }
+  }, [isDirty, onClose]);
+
+  const handleCancelClick = useCallback(() => {
+    if (isDirty) {
+      setShowDiscardDialog(true);
+    } else {
+      onClose();
+    }
+  }, [isDirty, onClose]);
+
+  const handleDiscardConfirm = useCallback(() => {
+    setShowDiscardDialog(false);
+    onClose();
+  }, [onClose]);
+
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? 'Edit User' : 'Add New User'}
-          </DialogTitle>
-          <DialogDescription>
-            {isEdit 
-              ? 'Update user information and permissions' 
-              : 'Create a new user account for your organization'}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {isEdit ? 'Edit User' : 'Add New User'}
+            </DialogTitle>
+            <DialogDescription>
+              {isEdit
+                ? 'Update user information and permissions'
+                : 'Create a new user account for your organization'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Personal Info */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-700">Personal Information</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">
-                  First Name
-                </Label>
-                <Input
-                  id="first_name"
-                  name="first_name"
-                  value={formData.first_name}
-                  onChange={handleChange}
-                  placeholder="John"
-                  disabled={loading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="last_name">
-                  Last Name
-                </Label>
-                <Input
-                  id="last_name"
-                  name="last_name"
-                  value={formData.last_name}
-                  onChange={handleChange}
-                  placeholder="Doe"
-                  disabled={loading}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">
-                Phone Number
-              </Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="+62 812 3456 7890"
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          {/* Account Info */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-700">Account Information</h3>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">
-                Email <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="john.doe@company.com"
-                required
-                disabled={loading || isEdit}
-              />
-              {isEdit && (
-                <p className="text-xs text-gray-500">
-                  Email cannot be changed after account creation
-                </p>
-              )}
-            </div>
-
-            {!isEdit && (
-              <div className="space-y-2">
-                <Label htmlFor="password">
-                  Password <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="••••••••"
-                  required={!isEdit}
-                  minLength={8}
-                  disabled={loading}
-                />
-                <p className="text-xs text-gray-500">
-                  Minimum 8 characters. User can change this later.
-                </p>
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
-          </div>
 
-          {/* Role & Branch */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-700">Role & Access</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="role">
-                  Role <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => handleSelectChange('role', value)}
-                  disabled={loading}
-                >
-                  <SelectTrigger id="role">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500">
-                  Staff: Basic access | Manager: Branch management | Admin: Full access
-                </p>
+            {/* Personal Info */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Personal Information</h3>
+
+              {/* Avatar Upload - Only shown when editing */}
+              {isEdit && user && (
+                <div className="flex items-center gap-4">
+                  <AvatarUpload
+                    userId={user.id}
+                    currentAvatarUrl={user.avatar_url}
+                    userName={user.first_name && user.last_name
+                      ? `${user.first_name} ${user.last_name}`
+                      : user.email}
+                    size="lg"
+                    onSuccess={() => toast.success('Avatar updated successfully')}
+                    onError={(err) => toast.error(err.message)}
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Profile Photo</p>
+                    <p className="text-xs text-muted-foreground">
+                      Click to upload a new avatar. Max 2MB.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="first_name">
+                    First Name
+                  </Label>
+                  <Input
+                    id="first_name"
+                    name="first_name"
+                    value={formData.first_name}
+                    onChange={handleChange}
+                    placeholder="John"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="last_name">
+                    Last Name
+                  </Label>
+                  <Input
+                    id="last_name"
+                    name="last_name"
+                    value={formData.last_name}
+                    onChange={handleChange}
+                    placeholder="Doe"
+                    disabled={loading}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="default_branch_id">
-                  Default Branch
+                <Label htmlFor="phone">
+                  Phone Number
                 </Label>
-                <Select
-                  value={formData.default_branch_id || 'No_Branch'}
-                  onValueChange={(value) => handleSelectChange('default_branch_id', value)}
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+62 812 3456 7890"
                   disabled={loading}
-                >
-                  <SelectTrigger id="default_branch_id">
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="No_Branch">No Branch</SelectItem>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name} ({branch.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500">
-                  Primary branch assignment for this user
-                </p>
+                />
               </div>
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onClose()}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEdit ? 'Updating...' : 'Creating...'}
-                </>
-              ) : (
-                <>{isEdit ? 'Update User' : 'Create User'}</>
+            {/* Account Info */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Account Information</h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">
+                  Email <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="john.doe@company.com"
+                  required
+                  disabled={loading || isEdit}
+                />
+                {isEdit && (
+                  <p className="text-xs text-gray-500">
+                    Email cannot be changed after account creation
+                  </p>
+                )}
+              </div>
+
+              {!isEdit && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">
+                    Password <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    required={!isEdit}
+                    minLength={8}
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Minimum 8 characters with uppercase, lowercase, and number. User can change this later.
+                  </p>
+                </div>
               )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            </div>
+
+            {/* Role & Branch */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Role & Access</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="role">
+                    Role <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={formData.role}
+                    onValueChange={(value) => handleSelectChange('role', value)}
+                    disabled={loading}
+                  >
+                    <SelectTrigger id="role">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    Staff: Basic access | Manager: Branch management | Admin: Full access
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="default_branch_id">
+                    Default Branch
+                  </Label>
+                  <Select
+                    value={formData.default_branch_id || 'No_Branch'}
+                    onValueChange={(value) => handleSelectChange('default_branch_id', value)}
+                    disabled={loading}
+                  >
+                    <SelectTrigger id="default_branch_id">
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="No_Branch">No Branch</SelectItem>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name} ({branch.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    Primary branch assignment for this user
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancelClick}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isEdit ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  <>{isEdit ? 'Update User' : 'Create User'}</>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsaved Changes Confirmation */}
+      <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Are you sure you want to discard them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Editing</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDiscardConfirm}>
+              Discard Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

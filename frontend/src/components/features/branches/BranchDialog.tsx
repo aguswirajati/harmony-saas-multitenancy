@@ -100,8 +100,9 @@ export function BranchDialog({ open, onClose, branch }: BranchDialogProps) {
         await branchAPI.create(formData);
       }
       onClose(true); // Success
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail ||
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      const errorMessage = axiosError.response?.data?.detail ||
         `Failed to ${isEdit ? 'update' : 'create'} branch`;
       setError(errorMessage);
     } finally {

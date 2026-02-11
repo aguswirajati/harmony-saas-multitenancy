@@ -34,8 +34,31 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
         error: null
       });
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 'Login failed';
+    } catch (error: unknown) {
+      const axiosError = error as {
+        response?: {
+          data?: {
+            detail?: string | Array<{ msg: string; loc: string[] }>;
+            error?: { message?: string; details?: Array<{ field: string; message: string }> };
+          }
+        }
+      };
+      let errorMessage = 'Login failed';
+      const detail = axiosError.response?.data?.detail;
+      const errorObj = axiosError.response?.data?.error;
+
+      if (errorObj) {
+        // Handle custom error handler format: {error: {message, details}}
+        if (errorObj.details && Array.isArray(errorObj.details) && errorObj.details.length > 0) {
+          errorMessage = errorObj.details.map(err => err.message).join('. ');
+        } else if (errorObj.message) {
+          errorMessage = errorObj.message;
+        }
+      } else if (typeof detail === 'string') {
+        errorMessage = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        errorMessage = detail.map(err => err.msg).join('. ');
+      }
       set({
         error: errorMessage,
         isLoading: false,
@@ -56,8 +79,32 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
         error: null
       });
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 'Registration failed';
+    } catch (error: unknown) {
+      const axiosError = error as {
+        response?: {
+          data?: {
+            detail?: string | Array<{ msg: string; loc: string[] }>;
+            error?: { message?: string; details?: Array<{ field: string; message: string }> };
+          }
+        }
+      };
+      let errorMessage = 'Registration failed';
+      const detail = axiosError.response?.data?.detail;
+      const errorObj = axiosError.response?.data?.error;
+
+      if (errorObj) {
+        // Handle custom error handler format: {error: {message, details}}
+        if (errorObj.details && Array.isArray(errorObj.details) && errorObj.details.length > 0) {
+          errorMessage = errorObj.details.map(err => err.message).join('. ');
+        } else if (errorObj.message) {
+          errorMessage = errorObj.message;
+        }
+      } else if (typeof detail === 'string') {
+        errorMessage = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        // Handle Pydantic validation errors (422)
+        errorMessage = detail.map(err => err.msg).join('. ');
+      }
       set({
         error: errorMessage,
         isLoading: false,

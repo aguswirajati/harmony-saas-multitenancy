@@ -15,7 +15,6 @@ import { tenantsAPI } from '@/lib/api/tenants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -66,7 +65,7 @@ export default function OrganizationSettingsPage() {
       toast.success('Settings updated successfully');
       reset({}, { keepValues: true });
     },
-    onError: (error: any) => {
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
       toast.error('Failed to update settings', {
         description: error.response?.data?.detail || error.message,
       });
@@ -106,7 +105,7 @@ export default function OrganizationSettingsPage() {
           Organization Settings
         </h1>
         <p className="text-muted-foreground">
-          Manage your organization's information and preferences
+          Manage your organization&apos;s information and preferences
         </p>
       </div>
 
@@ -116,7 +115,7 @@ export default function OrganizationSettingsPage() {
           <CardHeader>
             <CardTitle>Basic Information</CardTitle>
             <CardDescription>
-              Update your organization's name and branding
+              Update your organization&apos;s name and branding
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -166,6 +165,7 @@ export default function OrganizationSettingsPage() {
               {tenant?.logo_url && (
                 <div className="mt-2">
                   <p className="text-xs text-muted-foreground mb-2">Current logo:</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={tenant.logo_url}
                     alt="Organization logo"
@@ -182,7 +182,7 @@ export default function OrganizationSettingsPage() {
           <CardHeader>
             <CardTitle>Preferences</CardTitle>
             <CardDescription>
-              Customize your organization's regional and display settings
+              Customize your organization&apos;s regional and display settings
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

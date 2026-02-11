@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 1 (Critical Foundation): 100% complete.**
 
 What's built:
-- 57 API endpoints across 8 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats)
-- 22 frontend pages (6 public, 5 dashboard, 11 admin)
-- 5 models (User, Tenant, Branch, AuditLog) + BaseModel and TenantScopedModel abstract bases
-- 6 services (Auth, Tenant, User, Branch, Audit, Email)
+- 72 API endpoints across 14 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests)
+- 27 frontend pages (6 public, 7 dashboard, 14 admin)
+- 8 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest) + BaseModel and TenantScopedModel abstract bases
+- 8 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment)
 - 3 middleware (rate limiter, error handler, request logger)
 - 6 input validators (password, subdomain, email, name, SQL injection, XSS)
 - Permission matrix (RBAC with `require_permission` dependency + `usePermission` hook)
@@ -18,13 +18,15 @@ What's built:
 - User invitation system (invite + accept-invite flow)
 - Developer mode tools (DEV_MODE flag, dev toolbar, runtime settings, system info, app log viewer)
 - Format settings (tenant-level currency, number, date formatting with live preview)
+- Database-driven subscription tiers (admin CRUD, replaces hardcoded config)
+- Manual payment system (bank transfer + QRIS, proof upload, admin review workflow)
 - Performance benchmark script
 - 73 backend tests (tenant isolation, auth, services, authorization) - all passing
 - 20 Playwright E2E tests passing + 2 fixme (registration, login, dashboard, navigation)
 - Docker setup (Dockerfiles + docker-compose for local dev)
 - CI/CD (GitHub Actions for backend lint/test, frontend lint/build/e2e)
 
-What's NOT built yet (Phase 2+): notifications, file upload, i18n, billing integration.
+What's NOT built yet (Phase 2+): notifications, file upload, i18n, online payment integration (Stripe/Midtrans).
 
 For full status details, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
 

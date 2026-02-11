@@ -1,7 +1,6 @@
 'use client';
 
 import { CreateTenantForm } from '@/components/admin/CreateTenantForm';
-import { Card, CardContent } from '@/components/ui/card';
 
 export default function NewTenantPage() {
   return (

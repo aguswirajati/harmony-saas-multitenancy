@@ -1,8 +1,11 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
+
+// For hydration-safe mounting
+const emptySubscribe = () => () => {};
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -10,10 +13,27 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   const { user, checkAuth, isAuthenticated } = useAuthStore();
   const [authChecked, setAuthChecked] = useState(false);
 
-  useEffect(() => {
+  // Hydration-safe mounting check
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+
+  // Combined auth check logic
+  const performAuthCheck = useCallback(() => {
     checkAuth();
-    setAuthChecked(true);
+    return true;
   }, [checkAuth]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const checked = performAuthCheck();
+    if (checked) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Required for hydration-safe auth check
+      setAuthChecked(true);
+    }
+  }, [mounted, performAuthCheck]);
 
   useEffect(() => {
     if (!authChecked) return;

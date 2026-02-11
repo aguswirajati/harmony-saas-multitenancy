@@ -27,6 +27,7 @@ import {
   DATE_FORMAT_OPTIONS,
   TIMEZONE_OPTIONS,
 } from '@/lib/utils/format';
+import { TenantLogoUpload } from '@/components/features/tenant/TenantLogoUpload';
 
 interface TenantInfo {
   id: string;
@@ -38,7 +39,7 @@ interface TenantInfo {
   max_users: number;
   max_branches: number;
   max_storage_gb: number;
-  settings: Record<string, any>;
+  settings: Record<string, unknown>;
 }
 
 interface UsageData {
@@ -141,9 +142,10 @@ export default function SettingsPage() {
       // Populate form
       setFormName(tenantData.name);
       setFormLogoUrl(tenantData.logo_url || '');
-      setFormLanguage(tenantData.settings?.language || 'id');
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load settings');
+      setFormLanguage((tenantData.settings?.language as string) || 'id');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      setError(axiosError?.response?.data?.detail || 'Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -165,8 +167,9 @@ export default function SettingsPage() {
       setTenantInfo(updated);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to save settings');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      setError(axiosError?.response?.data?.detail || 'Failed to save settings');
     } finally {
       setSaving(false);
     }
@@ -181,8 +184,9 @@ export default function SettingsPage() {
       setFormatSettings(updated);
       setFormatSaveSuccess(true);
       setTimeout(() => setFormatSaveSuccess(false), 3000);
-    } catch (err: any) {
-      setFormatError(err?.response?.data?.detail || 'Failed to save format settings');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      setFormatError(axiosError?.response?.data?.detail || 'Failed to save format settings');
     } finally {
       setFormatSaving(false);
     }
@@ -263,14 +267,38 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="logo_url">Logo URL</Label>
-                  <Input
-                    id="logo_url"
-                    value={formLogoUrl}
-                    onChange={(e) => setFormLogoUrl(e.target.value)}
-                    disabled={!isAdmin}
-                    placeholder="https://example.com/logo.png"
-                  />
+                  <Label>Organization Logo</Label>
+                  {isAdmin ? (
+                    <TenantLogoUpload
+                      currentLogoUrl={tenantInfo?.logo_url || undefined}
+                      tenantName={tenantInfo?.name}
+                      onSuccess={() => {
+                        // Refresh tenant info to show updated logo
+                        loadData();
+                      }}
+                      onError={(err) => {
+                        setError(err.message);
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      {tenantInfo?.logo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={tenantInfo.logo_url}
+                          alt="Organization logo"
+                          className="h-16 w-16 rounded-lg object-cover border"
+                        />
+                      ) : (
+                        <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center">
+                          <Building2 className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        Contact an admin to change the logo
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="language">Language</Label>

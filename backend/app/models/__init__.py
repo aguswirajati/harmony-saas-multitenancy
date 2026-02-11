@@ -4,6 +4,25 @@ from app.models.tenant import Tenant
 from app.models.branch import Branch
 from app.models.user import User
 from app.models.audit_log import AuditLog
+from app.models.file import File, FileCategory
+from app.models.subscription_tier import SubscriptionTier
+from app.models.payment_method import PaymentMethod, PaymentMethodType
+from app.models.upgrade_request import UpgradeRequest, UpgradeRequestStatus, BillingPeriod
 
 # Export all models
-__all__ = ["Base", "TenantScopedModel", "Tenant", "Branch", "User", "AuditLog"]
+__all__ = [
+    "Base",
+    "TenantScopedModel",
+    "Tenant",
+    "Branch",
+    "User",
+    "AuditLog",
+    "File",
+    "FileCategory",
+    "SubscriptionTier",
+    "PaymentMethod",
+    "PaymentMethodType",
+    "UpgradeRequest",
+    "UpgradeRequestStatus",
+    "BillingPeriod",
+]

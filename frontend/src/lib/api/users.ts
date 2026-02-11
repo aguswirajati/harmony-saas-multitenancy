@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { User, UserWithBranch, UserCreate, UserUpdate, UserListResponse, UserChangePassword } from '@/types/user';
+import { User, UserCreate, UserUpdate, UserListResponse, UserChangePassword } from '@/types/user';
 
 export const userAPI = {
   list: async (params?: {

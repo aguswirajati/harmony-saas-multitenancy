@@ -139,11 +139,11 @@ export default function UsersPage() {
     switch (role) {
       case 'super_admin':
       case 'admin':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900';
       case 'manager':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900';
       default:
-        return 'bg-muted text-foreground';
+        return 'bg-muted text-foreground hover:bg-muted';
     }
   };
 

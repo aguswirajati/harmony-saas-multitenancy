@@ -34,8 +34,9 @@ export function DeleteBranchDialog({ open, onClose, branch }: DeleteBranchDialog
     try {
       await branchAPI.delete(branch.id);
       onClose(true); // Success
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to delete branch';
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      const errorMessage = axiosError.response?.data?.detail || 'Failed to delete branch';
       setError(errorMessage);
     } finally {
       setLoading(false);

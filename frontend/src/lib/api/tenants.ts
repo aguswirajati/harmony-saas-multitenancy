@@ -24,8 +24,8 @@ export interface Tenant {
   max_branches: number;
   max_storage_gb: number;
   features: Record<string, boolean>;
-  settings: Record<string, any>;
-  meta_data: Record<string, any>;
+  settings: Record<string, unknown>;
+  meta_data: Record<string, unknown>;
   trial_ends_at: string | null;
   subscription_ends_at: string | null;
   is_active: boolean;
@@ -141,8 +141,8 @@ export interface UpdateTenantData {
   name?: string;
   domain?: string;
   logo_url?: string;
-  settings?: Record<string, any>;
-  meta_data?: Record<string, any>;
+  settings?: Record<string, unknown>;
+  meta_data?: Record<string, unknown>;
 }
 
 export interface UpdateSubscriptionData {
@@ -398,7 +398,7 @@ export const tenantsAPI = {
   async updateSettings(data: {
     name?: string;
     logo_url?: string;
-    settings?: Record<string, any>;
+    settings?: Record<string, unknown>;
   }): Promise<Tenant> {
     const response = await apiClient.put<Tenant>('/tenant/settings', data);
     return response;
@@ -415,15 +415,15 @@ export const tenantsAPI = {
 export function getTierColor(tier: string): string {
   switch (tier) {
     case 'free':
-      return 'text-gray-700 bg-gray-100';
+      return 'text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800';
     case 'basic':
-      return 'text-blue-700 bg-blue-100';
+      return 'text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/50';
     case 'premium':
-      return 'text-purple-700 bg-purple-100';
+      return 'text-purple-700 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/50';
     case 'enterprise':
-      return 'text-amber-700 bg-amber-100';
+      return 'text-amber-700 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/50';
     default:
-      return 'text-gray-700 bg-gray-100';
+      return 'text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800';
   }
 }
 
@@ -433,17 +433,17 @@ export function getTierColor(tier: string): string {
 export function getStatusColor(status: string): string {
   switch (status) {
     case 'active':
-      return 'text-green-700 bg-green-100';
+      return 'text-green-700 dark:text-green-200 bg-green-100 dark:bg-green-900/50';
     case 'trial':
-      return 'text-blue-700 bg-blue-100';
+      return 'text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/50';
     case 'expired':
-      return 'text-red-700 bg-red-100';
+      return 'text-red-700 dark:text-red-200 bg-red-100 dark:bg-red-900/50';
     case 'cancelled':
-      return 'text-gray-700 bg-gray-100';
+      return 'text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800';
     case 'suspended':
-      return 'text-orange-700 bg-orange-100';
+      return 'text-orange-700 dark:text-orange-200 bg-orange-100 dark:bg-orange-900/50';
     default:
-      return 'text-gray-700 bg-gray-100';
+      return 'text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800';
   }
 }
 

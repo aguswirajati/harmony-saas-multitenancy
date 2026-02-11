@@ -1,17 +1,22 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+// Subscribe to nothing, we just need this for hydration
+const emptySubscribe = () => () => {};
+
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // useSyncExternalStore is the recommended way to handle hydration mismatch
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,  // Client: always true
+    () => false  // Server: always false
+  );
 
   if (!mounted) {
     return (

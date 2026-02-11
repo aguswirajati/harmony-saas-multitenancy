@@ -89,7 +89,7 @@ export function CreateTenantForm() {
 
   // Update limits when tier changes
   const handleTierChange = (tier: string) => {
-    setValue('tier', tier as any);
+    setValue('tier', tier as 'free' | 'basic' | 'premium' | 'enterprise');
     const preset = tierPresets[tier as keyof typeof tierPresets];
     if (preset) {
       setValue('max_users', preset.max_users);
@@ -113,7 +113,7 @@ export function CreateTenantForm() {
         router.push('/admin/tenants');
       }, 2000);
     },
-    onError: (error: any) => {
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
       toast.error('Failed to create tenant', {
         description: error.response?.data?.detail || error.message,
       });
@@ -344,7 +344,7 @@ export function CreateTenantForm() {
             <Input
               id="admin_password"
               type="password"
-              placeholder="Minimum 8 characters"
+              placeholder="Min 8 chars, uppercase, lowercase, number"
               {...register('admin_password')}
             />
             {errors.admin_password && (
@@ -352,9 +352,8 @@ export function CreateTenantForm() {
                 {errors.admin_password.message}
               </p>
             )}
-            <p className="text-xs text-gray-500">
-              The admin will receive this password via email and can change it
-              after first login.
+            <p className="text-xs text-muted-foreground">
+              Requires uppercase, lowercase, and number. Admin can change it after first login.
             </p>
           </div>
         </CardContent>

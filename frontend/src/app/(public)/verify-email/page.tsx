@@ -33,9 +33,10 @@ function EmailVerificationContent() {
         setTimeout(() => {
           router.push('/login');
         }, 3000);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const axiosError = err as { response?: { data?: { detail?: string } } };
         setError(
-          err.response?.data?.detail ||
+          axiosError.response?.data?.detail ||
           'Failed to verify email. The link may have expired.'
         );
       } finally {

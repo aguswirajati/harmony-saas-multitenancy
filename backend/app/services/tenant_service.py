@@ -30,51 +30,88 @@ from app.models.audit_log import AuditAction, AuditStatus
 logger = logging.getLogger(__name__)
 
 
+# Fallback tier configs when database tiers are not available
+# These are used during initial setup before seeding
+FALLBACK_TIER_CONFIGS = {
+    "free": {
+        "display_name": "Free",
+        "price_monthly": 0,
+        "price_yearly": 0,
+        "max_users": 5,
+        "max_branches": 1,
+        "max_storage_gb": 1,
+        "features": ["Basic Dashboard", "User Management", "1 Branch"],
+    },
+    "basic": {
+        "display_name": "Basic",
+        "price_monthly": 299000,
+        "price_yearly": 2990000,
+        "max_users": 20,
+        "max_branches": 5,
+        "max_storage_gb": 10,
+        "features": ["All Free Features", "5 Branches", "10GB Storage", "Email Support"],
+    },
+    "premium": {
+        "display_name": "Premium",
+        "price_monthly": 999000,
+        "price_yearly": 9990000,
+        "max_users": 100,
+        "max_branches": 20,
+        "max_storage_gb": 50,
+        "features": ["All Basic Features", "20 Branches", "50GB Storage", "Priority Support", "API Access"],
+    },
+    "enterprise": {
+        "display_name": "Enterprise",
+        "price_monthly": 2999000,
+        "price_yearly": 29990000,
+        "max_users": -1,  # Unlimited
+        "max_branches": -1,  # Unlimited
+        "max_storage_gb": 200,
+        "features": ["All Premium Features", "Unlimited Users", "Unlimited Branches", "200GB Storage", "24/7 Support", "Custom Integration"],
+    }
+}
+
+
 class TenantService:
     """Service for tenant management operations"""
-    
-    # Tier configurations
-    TIER_CONFIGS = {
-        "free": {
-            "display_name": "Free",
-            "price_monthly": 0,
-            "price_yearly": 0,
-            "max_users": 5,
-            "max_branches": 1,
-            "max_storage_gb": 1,
-            "features": ["Basic Dashboard", "User Management", "1 Branch"],
-        },
-        "basic": {
-            "display_name": "Basic",
-            "price_monthly": 29,
-            "price_yearly": 290,
-            "max_users": 20,
-            "max_branches": 5,
-            "max_storage_gb": 10,
-            "features": ["All Free Features", "5 Branches", "10GB Storage", "Email Support"],
-        },
-        "premium": {
-            "display_name": "Premium",
-            "price_monthly": 99,
-            "price_yearly": 990,
-            "max_users": 100,
-            "max_branches": 20,
-            "max_storage_gb": 50,
-            "features": ["All Basic Features", "20 Branches", "50GB Storage", "Priority Support", "API Access"],
-        },
-        "enterprise": {
-            "display_name": "Enterprise",
-            "price_monthly": 299,
-            "price_yearly": 2990,
-            "max_users": -1,  # Unlimited
-            "max_branches": -1,  # Unlimited
-            "max_storage_gb": 200,
-            "features": ["All Premium Features", "Unlimited Users", "Unlimited Branches", "200GB Storage", "24/7 Support", "Custom Integration"],
-        }
-    }
-    
+
+    # Keep TIER_CONFIGS for backwards compatibility
+    TIER_CONFIGS = FALLBACK_TIER_CONFIGS
+
     def __init__(self, db: Session):
         self.db = db
+
+    def _get_tier_config(self, tier_code: str) -> dict:
+        """
+        Get tier configuration from database, with fallback to hardcoded values.
+
+        Returns dict with: display_name, price_monthly, price_yearly,
+        max_users, max_branches, max_storage_gb, features
+        """
+        # Try database first
+        try:
+            from app.models.subscription_tier import SubscriptionTier
+            tier = self.db.query(SubscriptionTier).filter(
+                SubscriptionTier.code == tier_code,
+                SubscriptionTier.is_active == True
+            ).first()
+
+            if tier:
+                return {
+                    "display_name": tier.display_name,
+                    "price_monthly": tier.price_monthly,
+                    "price_yearly": tier.price_yearly,
+                    "max_users": tier.max_users,
+                    "max_branches": tier.max_branches,
+                    "max_storage_gb": tier.max_storage_gb,
+                    "features": tier.features or [],
+                }
+        except Exception as e:
+            # Table might not exist yet during migrations
+            logger.debug(f"Could not fetch tier from DB: {e}")
+
+        # Fallback to hardcoded config
+        return FALLBACK_TIER_CONFIGS.get(tier_code, FALLBACK_TIER_CONFIGS["free"])
 
     @staticmethod
     def _get_storage_used_gb(tenant_id) -> float:
@@ -266,12 +303,15 @@ class TenantService:
         """Update tenant subscription (Super Admin only)"""
         tenant = self.get_tenant_by_id(tenant_id)
 
-        # Update subscription fields
+        # Get tier defaults if limits not explicitly provided (from DB or fallback)
+        tier_config = self._get_tier_config(subscription_data.tier)
+
+        # Update subscription fields - use provided values or tier defaults
         tenant.tier = subscription_data.tier
-        tenant.subscription_status = subscription_data.subscription_status
-        tenant.max_users = subscription_data.max_users
-        tenant.max_branches = subscription_data.max_branches
-        tenant.max_storage_gb = subscription_data.max_storage_gb
+        tenant.subscription_status = subscription_data.subscription_status if subscription_data.subscription_status is not None else tenant.subscription_status
+        tenant.max_users = subscription_data.max_users if subscription_data.max_users is not None else tier_config["max_users"]
+        tenant.max_branches = subscription_data.max_branches if subscription_data.max_branches is not None else tier_config["max_branches"]
+        tenant.max_storage_gb = subscription_data.max_storage_gb if subscription_data.max_storage_gb is not None else tier_config["max_storage_gb"]
         tenant.trial_ends_at = subscription_data.trial_ends_at
         tenant.subscription_ends_at = subscription_data.subscription_ends_at
 
@@ -289,9 +329,9 @@ class TenantService:
                 resource_id=tenant.id,
                 details={
                     "subdomain": tenant.subdomain,
-                    "new_tier": subscription_data.tier,
-                    "new_status": subscription_data.subscription_status,
-                    "max_users": subscription_data.max_users
+                    "new_tier": tenant.tier,
+                    "new_status": tenant.subscription_status,
+                    "max_users": tenant.max_users
                 },
                 status=AuditStatus.SUCCESS,
                 request=request
@@ -687,8 +727,39 @@ class TenantService:
     def get_available_tiers(self, current_tier: str) -> AvailableTiers:
         """Get list of available subscription tiers with pricing"""
         tiers = []
-        
-        for tier_code, config in self.TIER_CONFIGS.items():
+
+        # Try to get from database first
+        try:
+            from app.models.subscription_tier import SubscriptionTier
+            db_tiers = self.db.query(SubscriptionTier).filter(
+                SubscriptionTier.is_active == True,
+                SubscriptionTier.is_public == True
+            ).order_by(SubscriptionTier.sort_order).all()
+
+            if db_tiers:
+                for tier in db_tiers:
+                    tier_info = TierInfo(
+                        tier=tier.code,
+                        display_name=tier.display_name,
+                        price_monthly=tier.price_monthly,
+                        price_yearly=tier.price_yearly,
+                        max_users=tier.max_users,
+                        max_branches=tier.max_branches,
+                        max_storage_gb=tier.max_storage_gb,
+                        features=tier.features or [],
+                        is_recommended=tier.is_recommended
+                    )
+                    tiers.append(tier_info)
+
+                return AvailableTiers(
+                    tiers=tiers,
+                    current_tier=current_tier
+                )
+        except Exception as e:
+            logger.debug(f"Could not fetch tiers from DB: {e}")
+
+        # Fallback to hardcoded config
+        for tier_code, config in FALLBACK_TIER_CONFIGS.items():
             tier_info = TierInfo(
                 tier=tier_code,
                 display_name=config['display_name'],
@@ -701,7 +772,7 @@ class TenantService:
                 is_recommended=(tier_code == 'premium')
             )
             tiers.append(tier_info)
-        
+
         return AvailableTiers(
             tiers=tiers,
             current_tier=current_tier

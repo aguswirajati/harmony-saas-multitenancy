@@ -38,6 +38,21 @@ class Settings(BaseSettings):
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1
     SENTRY_ENVIRONMENT: str = "development"
 
+    # S3-Compatible Storage Configuration
+    S3_ENDPOINT_URL: str = "http://localhost:9000"  # MinIO for local dev
+    S3_ACCESS_KEY_ID: str = "minioadmin"
+    S3_SECRET_ACCESS_KEY: str = "minioadmin123"
+    S3_BUCKET_NAME: str = "harmony-uploads"
+    S3_REGION: str = "us-east-1"
+    S3_PUBLIC_URL: str = ""  # Optional public URL for serving files
+    S3_PRESIGNED_URL_EXPIRY: int = 3600  # URL expiry in seconds (1 hour)
+
+    # File Upload Limits
+    MAX_UPLOAD_SIZE_MB: int = 50  # Max file size in MB
+    MAX_IMAGE_SIZE_MB: int = 10  # Max image size in MB
+    ALLOWED_IMAGE_EXTENSIONS: list[str] = ["jpg", "jpeg", "png", "gif", "webp", "svg"]
+    ALLOWED_DOCUMENT_EXTENSIONS: list[str] = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "zip"]
+
     class Config:
         env_file = ".env"
 

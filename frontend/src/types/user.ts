@@ -6,6 +6,7 @@ export interface User {
   last_name: string | null;
   full_name: string | null;
   phone: string | null;
+  avatar_url: string | null;
   role: string;
   default_branch_id: string | null;
   is_active: boolean;
@@ -32,11 +33,11 @@ export interface UserCreate {
 }
 
 export interface UserUpdate {
-  first_name?: string;
-  last_name?: string;
-  phone?: string;
-  avatar_url?: string;
-  default_branch_id?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  avatar_url?: string | null;
+  default_branch_id?: string | null;
   role?: string;
   is_active?: boolean;
 }

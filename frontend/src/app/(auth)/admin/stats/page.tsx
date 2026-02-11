@@ -12,7 +12,6 @@ import {
   TrendingDown,
   Activity,
   UserCheck,
-  UserX,
   ShieldAlert
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -81,28 +80,28 @@ export default function AdminStatsPage() {
   const getTierBadgeColor = (tier: string) => {
     switch (tier) {
       case 'enterprise':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
+        return 'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700';
       case 'premium':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
+        return 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700';
       case 'basic':
-        return 'bg-green-100 text-green-800 border-green-300';
+        return 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700';
       case 'free':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
     }
   };
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'super_admin':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
+        return 'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700';
       case 'admin':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
+        return 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700';
       case 'staff':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
     }
   };
 

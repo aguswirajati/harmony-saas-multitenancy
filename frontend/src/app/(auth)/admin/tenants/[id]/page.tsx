@@ -43,7 +43,6 @@ import {
   Building2,
   Users,
   GitBranch,
-  Shield,
   Crown,
   Globe,
   Database,
@@ -59,6 +58,20 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
+
+// API error type
+interface ApiError extends Error {
+  message: string;
+}
+
+// Subscription update data
+interface SubscriptionUpdateData {
+  tier: string;
+  subscription_status: string;
+  max_users: number;
+  max_branches: number;
+  max_storage_gb: number;
+}
 
 interface TenantDetail {
   id: string;
@@ -79,7 +92,7 @@ interface TenantDetail {
   trial_ends_at?: string;
   subscription_ends_at?: string;
   features: Record<string, boolean>;
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 }
 
 interface TenantUser {
@@ -168,20 +181,20 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       toast.success('Tenant information updated successfully');
       setEditDialogOpen(false);
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to update tenant');
     },
   });
 
   // Update subscription mutation
   const updateSubscriptionMutation = useMutation({
-    mutationFn: (data: any) =>
+    mutationFn: (data: SubscriptionUpdateData) =>
       apiClient.put(`/admin/tenants/${tenantId}/subscription`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
       toast.success('Subscription updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to update subscription');
     },
   });
@@ -194,7 +207,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
       toast.success('Features updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to update features');
     },
   });
@@ -207,7 +220,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
       toast.success('Tenant status updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to update status');
     },
   });
@@ -219,7 +232,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       toast.success('Tenant deleted successfully');
       router.push('/admin/tenants');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to delete tenant');
     },
   });
@@ -240,12 +253,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       setSubMaxUsers(tenant.max_users);
       setSubMaxBranches(tenant.max_branches);
       setSubMaxStorage(tenant.max_storage_gb);
-    }
-  };
-
-  const initializeFeatures = () => {
-    if (tenant) {
-      setFeatures(tenant.features || {});
     }
   };
 
@@ -320,21 +327,21 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case 'enterprise': return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'premium': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'basic': return 'bg-green-100 text-green-800 border-green-300';
-      case 'free': return 'bg-gray-100 text-gray-800 border-gray-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'enterprise': return 'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700';
+      case 'premium': return 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700';
+      case 'basic': return 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700';
+      case 'free': return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
+      default: return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-300';
-      case 'trial': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'expired': return 'bg-red-100 text-red-800 border-red-300';
-      case 'suspended': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'active': return 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700';
+      case 'trial': return 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700';
+      case 'expired': return 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700';
+      case 'suspended': return 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700';
+      default: return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
     }
   };
 
@@ -598,7 +605,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Tenant ID</span>
-              <code className="text-xs bg-gray-100 px-2 py-1 rounded">{tenant.id}</code>
+              <code className="text-xs bg-muted px-2 py-1 rounded">{tenant.id}</code>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Subdomain</span>

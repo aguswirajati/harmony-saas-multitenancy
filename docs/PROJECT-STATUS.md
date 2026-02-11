@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-02-07
+> Last updated: 2026-02-12
 
 ---
 
@@ -32,14 +32,16 @@
 | User invitations | Done | Invite endpoint, accept-invite flow, email integration, 7-day token expiry |
 | Performance benchmarks | Done | `scripts/benchmark.py` with httpx, `docs/PERFORMANCE.md` |
 | Format settings | Done | Tenant-level currency, number, date formatting with live preview in settings |
+| Subscription tiers (DB-driven) | Done | Database-driven tier config, admin UI for CRUD, replaces hardcoded tiers |
+| Manual payment system | Done | Bank transfer + QRIS, upgrade requests with proof upload, admin review/approval |
 
-**Overall**: Phase 1 (Critical Foundation) is **100% complete**. Boilerplate finalization features added.
+**Overall**: Phase 1 (Critical Foundation) is **100% complete**. Phase 2 (Subscription System) now complete.
 
 ---
 
 ## 2. What's Implemented
 
-### Backend: 57 API Endpoints across 8 Routers
+### Backend: 72 API Endpoints across 14 Routers
 
 | Router | Prefix | Endpoints | Auth Required |
 |--------|--------|-----------|---------------|
@@ -52,8 +54,14 @@
 | audit | `/api/v1/audit` | 7 (list logs, stats, actions, resources, detail, clear, archive) | Admin (AUDIT_VIEW permission) |
 | admin-tools | `/api/v1/admin/tools` | 5 (seed data, reset DB, settings get/post, system-info, logs) | Super Admin |
 | admin-stats | `/api/v1/admin/stats` | 1 (system-wide statistics) | Super Admin |
+| subscription-tiers (admin) | `/api/v1/admin/tiers` | 6 (list, get, create, update, delete, reorder) | Super Admin |
+| subscription-tiers (public) | `/api/v1/tiers` | 2 (list public tiers, get tier by code) | Public |
+| payment-methods (admin) | `/api/v1/admin/payment-methods` | 6 (list, get, create, update, delete, set QRIS image) | Super Admin |
+| payment-methods (public) | `/api/v1/payment-methods` | 1 (list available methods) | Authenticated |
+| upgrade-requests (tenant) | `/api/v1/upgrade-requests` | 5 (create, list, get, upload proof, cancel, preview) | Tenant Admin |
+| upgrade-requests (admin) | `/api/v1/admin/upgrade-requests` | 4 (list all, get, review, stats, pending count) | Super Admin |
 
-### Backend: Models (4 concrete + 2 abstract bases)
+### Backend: Models (8 concrete + 2 abstract bases)
 
 | Model | Table | Key Fields |
 |-------|-------|------------|
@@ -61,19 +69,25 @@
 | Tenant | `tenants` | name, code, subdomain, subscription_tier, max_users, max_branches, features (JSON) |
 | Branch | `branches` | name, code, tenant_id, is_headquarters |
 | AuditLog | `audit_logs` | user_id, tenant_id, action, resource, details (JSON), ip_address, request_id |
+| File | `files` | filename, storage_key, content_type, size_bytes, category, tenant_id |
+| SubscriptionTier | `subscription_tiers` | code, display_name, price_monthly, price_yearly, max_users, max_branches, max_storage_gb, features (JSON) |
+| PaymentMethod | `payment_methods` | code, name, type (bank_transfer/qris), bank_name, account_number, qris_image_file_id |
+| UpgradeRequest | `upgrade_requests` | request_number, tenant_id, current/target_tier_code, amount, status, payment_proof_file_id |
 | BaseModel | (abstract) | id (UUID), created_at, updated_at, deleted_at, is_active, created_by_id, updated_by_id, deleted_by_id |
 | TenantScopedModel | (abstract) | Inherits BaseModel + tenant_id (CASCADE), branch_id (SET NULL) |
 
-### Backend: Services (6)
+### Backend: Services (8)
 
 | Service | Purpose |
 |---------|---------|
 | AuthService | Registration, login, token refresh, password reset, email verification |
-| TenantService | Tenant CRUD, subscription management, system stats, tier configs |
+| TenantService | Tenant CRUD, subscription management, system stats, tier configs (from DB) |
 | UserService | User CRUD within tenant, role management, tier limit checks, user invitation |
 | BranchService | Branch CRUD within tenant, HQ management, tier limit checks |
 | AuditService | Log actions, query audit trail, security event tracking |
 | EmailService | SMTP sending, Jinja2 template rendering (welcome, reset, verify, invite) |
+| SubscriptionTierService | Tier CRUD, get public/all tiers, tier limits lookup, default tier seeding |
+| PaymentService | Payment method CRUD, upgrade request lifecycle (create → proof → review → apply) |
 
 ### Backend: Middleware (3)
 
@@ -94,7 +108,7 @@
 | SQLInjectionValidator | Detects SQL keywords, comments, injection patterns |
 | XSSValidator | Detects script tags, javascript: protocol, event handlers |
 
-### Frontend: 22 Pages
+### Frontend: 27 Pages
 
 **Public (6 pages)**:
 | Route | Purpose |
@@ -106,7 +120,7 @@
 | `/verify-email` | Verify email with token |
 | `/accept-invite` | Accept user invitation and set password |
 
-**Dashboard - Tenant Users (5 pages)**:
+**Dashboard - Tenant Users (7 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/dashboard` | Stats, usage cards, quick actions |
@@ -114,8 +128,10 @@
 | `/users` | User CRUD with tier limit pre-check |
 | `/settings` | Organization tab + Subscription/usage tab + Format settings tab |
 | `/audit-logs` | Tenant-scoped audit log viewer (admin only) |
+| `/upgrade` | Step-by-step upgrade wizard (tier → billing → payment → confirm) |
+| `/upgrade/history` | View and manage upgrade requests |
 
-**Admin - Super Admin (11 pages)**:
+**Admin - Super Admin (14 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/admin` | Dashboard with system stats |
@@ -129,6 +145,9 @@
 | `/admin/tools` | Developer tools (seed, reset, runtime settings, system info, logs) |
 | `/admin/settings/organization` | Admin org settings |
 | `/admin/settings/subscription` | Admin subscription settings |
+| `/admin/tiers` | Subscription tier CRUD (pricing, limits, features) |
+| `/admin/payment-methods` | Payment method CRUD (bank transfer, QRIS) |
+| `/admin/upgrade-requests` | Review and approve/reject upgrade requests |
 
 ### Frontend: Key Components
 
@@ -153,6 +172,8 @@
 | `a53b92ec41a0` | Add audit logs table |
 | `b7f2a1c3d4e5` | Add user invitation fields (token, expiry, invited_by) |
 | `73458efe5641` | Add audit tracking (created/updated/deleted_by_id), tenant code, TenantScopedModel base |
+| `d8f3a2b5c6e7` | Add file storage (files table, tenant storage tracking) |
+| `e9f4a3b6c7d8` | Add subscription system (subscription_tiers, payment_methods, upgrade_requests) |
 
 ---
 
@@ -254,12 +275,15 @@ Before this project can be considered a production-ready boilerplate:
 - Language switcher component
 - Backend error messages with i18n keys
 
-**Subscription & Billing**
-- Stripe or Midtrans payment integration
-- Self-service tier upgrade/downgrade
-- Payment history and invoice generation
-- Usage-based billing support
-- Trial period management
+**Subscription & Billing** (Partial - Manual Payment Done)
+- ~~Database-driven subscription tiers~~ Done (admin CRUD, replaces hardcoded config)
+- ~~Manual payment system (Indonesia market)~~ Done (bank transfer + QRIS, proof upload, admin review)
+- ~~Self-service tier upgrade flow~~ Done (4-step wizard: tier → billing → payment → confirm)
+- ~~Upgrade request tracking~~ Done (status workflow: pending → payment_uploaded → approved/rejected)
+- Stripe or Midtrans online payment integration (deferred)
+- Automatic invoice generation (deferred)
+- Usage-based billing support (deferred)
+- Trial period management (deferred)
 
 **User Invitations** (Done)
 - ~~Admin sends invite email to new user~~ Done (`POST /api/v1/users/invite`)
@@ -332,5 +356,6 @@ Before this project can be considered a production-ready boilerplate:
 | 11 | 2026-02-04 | Dark mode & UI polish | Fixed dark mode text colors across admin/dashboard pages (branches, users, settings), dev tools card reordering (System Info → Runtime Settings → Request Logs → Database Tools), admin dashboard welcome card conditional (only when no tenants), dev toolbar fix (only show when logged in), TenantDataTable dark mode fixes |
 | 12 | 2026-02-04 | React hooks bug fix | Fixed "Rendered fewer hooks than expected" crash on /admin/tools page when toggling dev_mode off - moved all hooks above conditional early return |
 | 13 | 2026-02-07 | SSR fix & Format settings | Fixed Next.js 16 Turbopack SSR prerender error (server/client component split pattern), implemented tenant-level format settings (currency, number, date formatting with live preview) |
+| 14 | 2026-02-12 | Subscription & Payment system | Database-driven subscription tiers (admin CRUD), manual payment system (bank transfer + QRIS), upgrade request workflow (create → proof upload → admin review → apply), 15 new endpoints, 3 new models |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

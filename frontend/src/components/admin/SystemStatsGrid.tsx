@@ -11,7 +11,6 @@ import {
   Building2,
   Users,
   GitBranch,
-  TrendingUp,
   Clock,
   AlertCircle,
   CheckCircle,

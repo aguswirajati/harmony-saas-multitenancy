@@ -15,7 +15,10 @@ export type Permission =
   | 'settings.update'
   | 'audit.view'
   | 'dashboard.view'
-  | 'stats.view';
+  | 'stats.view'
+  | 'files.view'
+  | 'files.upload'
+  | 'files.delete';
 
 const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
   super_admin: new Set([
@@ -25,6 +28,7 @@ const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
     'settings.view', 'settings.update',
     'audit.view',
     'dashboard.view', 'stats.view',
+    'files.view', 'files.upload', 'files.delete',
   ]),
   admin: new Set([
     'users.view', 'users.create', 'users.update', 'users.delete',
@@ -33,11 +37,13 @@ const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
     'settings.view', 'settings.update',
     'audit.view',
     'dashboard.view', 'stats.view',
+    'files.view', 'files.upload', 'files.delete',
   ]),
   staff: new Set([
     'users.view',
     'branches.view',
     'dashboard.view',
+    'files.view', 'files.upload',
   ]),
 };
 

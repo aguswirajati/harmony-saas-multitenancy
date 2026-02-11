@@ -35,8 +35,9 @@ export function DeleteUserDialog({ open, onClose, user }: DeleteUserDialogProps)
     try {
       await userAPI.delete(user.id);
       onClose(true); // Success
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to delete user';
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      const errorMessage = axiosError.response?.data?.detail || 'Failed to delete user';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -59,27 +60,29 @@ export function DeleteUserDialog({ open, onClose, user }: DeleteUserDialogProps)
         </DialogHeader>
 
         <div className="py-4">
-          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Name:</span>
-              <span className="text-sm font-medium">
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 space-y-3">
+            <div className="grid grid-cols-[80px_1fr] items-center gap-2">
+              <span className="text-sm text-muted-foreground">Name:</span>
+              <span className="text-sm font-medium text-right">
                 {user.full_name || user.email.split('@')[0]}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Email:</span>
-              <span className="text-sm font-medium">{user.email}</span>
+            <div className="grid grid-cols-[80px_1fr] items-center gap-2">
+              <span className="text-sm text-muted-foreground">Email:</span>
+              <span className="text-sm font-medium text-right break-all">{user.email}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Role:</span>
-              <Badge className="bg-purple-100 text-purple-800">
-                {user.role.replace('_', ' ')}
-              </Badge>
+            <div className="grid grid-cols-[80px_1fr] items-center gap-2">
+              <span className="text-sm text-muted-foreground">Role:</span>
+              <div className="text-right">
+                <Badge className="bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/50">
+                  {user.role.replace('_', ' ')}
+                </Badge>
+              </div>
             </div>
             {user.branch_name && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Branch:</span>
-                <span className="text-sm font-medium">{user.branch_name}</span>
+              <div className="grid grid-cols-[80px_1fr] items-center gap-2">
+                <span className="text-sm text-muted-foreground">Branch:</span>
+                <span className="text-sm font-medium text-right">{user.branch_name}</span>
               </div>
             )}
           </div>
@@ -90,11 +93,11 @@ export function DeleteUserDialog({ open, onClose, user }: DeleteUserDialogProps)
             </Alert>
           )}
 
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
+          <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
               <strong>Warning:</strong> Deleting this user will:
             </p>
-            <ul className="list-disc list-inside text-sm text-yellow-700 mt-2 space-y-1">
+            <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-300 mt-2 space-y-1">
               <li>Deactivate their account immediately</li>
               <li>Revoke all access permissions</li>
               <li>Prevent them from logging in</li>
