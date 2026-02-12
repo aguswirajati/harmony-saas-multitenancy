@@ -51,9 +51,10 @@ class PaymentService:
 
     def create_payment_method(self, data: PaymentMethodCreate) -> PaymentMethod:
         """Create a new payment method"""
-        # Check code uniqueness
+        # Check code uniqueness (only among active records)
         existing = self.db.query(PaymentMethod).filter(
-            PaymentMethod.code == data.code
+            PaymentMethod.code == data.code,
+            PaymentMethod.is_active == True
         ).first()
         if existing:
             raise ConflictException(f"Payment method with code '{data.code}' already exists")
@@ -65,6 +66,7 @@ class PaymentService:
             bank_name=data.bank_name,
             account_number=data.account_number,
             account_name=data.account_name,
+            wallet_type=data.wallet_type,
             instructions=data.instructions,
             sort_order=data.sort_order,
             is_public=data.is_public,
