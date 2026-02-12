@@ -102,8 +102,8 @@ def get_payment_method(
 @admin_router.put("/{method_id}", response_model=PaymentMethodResponse)
 def update_payment_method(
     data: PaymentMethodUpdate,
+    request: Request,
     method_id: UUID = Path(..., description="Payment method ID"),
-    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin_user),
 ):
@@ -113,7 +113,26 @@ def update_payment_method(
     **Super Admin Only**
     """
     service = PaymentService(db)
+
+    # Get old values before update for audit trail
+    old_method = service.get_payment_method_by_id(method_id)
+    old_values = {
+        "name": old_method.name,
+        "bank_name": old_method.bank_name,
+        "account_number": old_method.account_number,
+        "account_name": old_method.account_name,
+        "instructions": old_method.instructions,
+        "is_active": old_method.is_active,
+    }
+
     payment_method = service.update_payment_method(method_id, data)
+
+    # Build detailed changes dict
+    changes = {}
+    update_data = data.model_dump(exclude_unset=True)
+    for field, new_value in update_data.items():
+        if field in old_values and old_values[field] != new_value:
+            changes[field] = {"from": old_values[field], "to": new_value}
 
     # Log audit
     AuditService.log_action(
@@ -125,7 +144,8 @@ def update_payment_method(
         resource_id=payment_method.id,
         details={
             "code": payment_method.code,
-            "updated_fields": list(data.model_dump(exclude_unset=True).keys()),
+            "name": payment_method.name,
+            "changes": changes,
         },
         status=AuditStatus.SUCCESS,
         request=request,
@@ -136,8 +156,8 @@ def update_payment_method(
 
 @admin_router.delete("/{method_id}", status_code=204)
 def delete_payment_method(
+    request: Request,
     method_id: UUID = Path(..., description="Payment method ID"),
-    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin_user),
 ):
@@ -172,9 +192,9 @@ def delete_payment_method(
 
 @admin_router.post("/{method_id}/qris", response_model=PaymentMethodResponse)
 def set_qris_image(
+    request: Request,
     method_id: UUID = Path(..., description="Payment method ID"),
     file_id: UUID = Query(..., description="File ID of uploaded QRIS image"),
-    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin_user),
 ):

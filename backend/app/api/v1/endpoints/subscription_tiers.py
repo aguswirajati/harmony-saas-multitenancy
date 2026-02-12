@@ -99,8 +99,8 @@ def get_tier(
 @admin_router.put("/{tier_id}", response_model=SubscriptionTierResponse)
 def update_tier(
     data: SubscriptionTierUpdate,
+    request: Request,
     tier_id: UUID = Path(..., description="Tier ID"),
-    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin_user),
 ):
@@ -110,7 +110,28 @@ def update_tier(
     **Super Admin Only**
     """
     service = SubscriptionTierService(db)
+
+    # Get old values before update for audit trail
+    old_tier = service.get_tier_by_id(tier_id)
+    old_values = {
+        "display_name": old_tier.display_name,
+        "price_monthly": old_tier.price_monthly,
+        "price_yearly": old_tier.price_yearly,
+        "max_users": old_tier.max_users,
+        "max_branches": old_tier.max_branches,
+        "max_storage_gb": old_tier.max_storage_gb,
+        "is_public": old_tier.is_public,
+        "is_recommended": old_tier.is_recommended,
+    }
+
     tier = service.update_tier(tier_id, data)
+
+    # Build detailed changes dict
+    changes = {}
+    update_data = data.model_dump(exclude_unset=True)
+    for field, new_value in update_data.items():
+        if field in old_values and old_values[field] != new_value:
+            changes[field] = {"from": old_values[field], "to": new_value}
 
     # Log audit
     AuditService.log_action(
@@ -122,7 +143,8 @@ def update_tier(
         resource_id=tier.id,
         details={
             "code": tier.code,
-            "updated_fields": list(data.model_dump(exclude_unset=True).keys()),
+            "display_name": tier.display_name,
+            "changes": changes,
         },
         status=AuditStatus.SUCCESS,
         request=request,
@@ -133,8 +155,8 @@ def update_tier(
 
 @admin_router.delete("/{tier_id}", status_code=204)
 def delete_tier(
+    request: Request,
     tier_id: UUID = Path(..., description="Tier ID"),
-    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin_user),
 ):

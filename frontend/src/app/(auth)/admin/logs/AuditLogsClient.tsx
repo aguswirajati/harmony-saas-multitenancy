@@ -187,6 +187,10 @@ export default function AuditLogsClient() {
     if (action.startsWith('branch.')) return 'Branch';
     if (action.startsWith('settings.')) return 'Settings';
     if (action.startsWith('system.')) return 'System';
+    if (action.startsWith('tier.')) return 'Subscription Tier';
+    if (action.startsWith('payment_method.')) return 'Payment Method';
+    if (action.startsWith('upgrade.')) return 'Upgrade Request';
+    if (action.startsWith('file.')) return 'File';
     return 'Other';
   };
 
