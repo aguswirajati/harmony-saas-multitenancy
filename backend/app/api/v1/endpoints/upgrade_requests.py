@@ -232,6 +232,95 @@ def cancel_upgrade_request(
     return _build_upgrade_response(db, upgrade_request)
 
 
+@tenant_router.put("/{request_id}", response_model=UpgradeRequestResponse)
+def update_upgrade_request(
+    data: UpgradeRequestCreate,
+    request_id: UUID = Path(..., description="Upgrade request ID"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Update a pending upgrade request
+
+    **Tenant Admin Only**
+
+    Note: Can only update requests in pending status (before payment proof uploaded).
+    """
+    if current_user.role == "super_admin":
+        from app.core.exceptions import ForbiddenException
+        raise ForbiddenException("Super admin should use admin endpoints")
+
+    service = PaymentService(db)
+    upgrade_request = service.update_upgrade_request(
+        request_id=request_id,
+        tenant_id=tenant.id,
+        user_id=current_user.id,
+        target_tier_code=data.target_tier_code,
+        billing_period=data.billing_period,
+        payment_method_id=data.payment_method_id,
+        request=request,
+    )
+
+    return _build_upgrade_response(db, upgrade_request)
+
+
+@tenant_router.get("/{request_id}/invoice")
+def get_invoice_data(
+    request_id: UUID = Path(..., description="Upgrade request ID"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Get invoice data for an upgrade request
+
+    **Tenant Admin Only**
+
+    Returns data needed to generate/display an invoice.
+    """
+    if current_user.role == "super_admin":
+        from app.core.exceptions import ForbiddenException
+        raise ForbiddenException("Super admin should use admin endpoints")
+
+    from app.schemas.payment import InvoiceData
+
+    service = PaymentService(db)
+    upgrade_request = service.get_upgrade_request_by_id(request_id, tenant.id)
+
+    # Get payment method name
+    payment_method_name = None
+    if upgrade_request.payment_method:
+        payment_method_name = upgrade_request.payment_method.name
+
+    # Build description
+    description = f"Subscription upgrade: {upgrade_request.current_tier_code} → {upgrade_request.target_tier_code}"
+
+    # Determine status
+    if upgrade_request.status == "approved":
+        invoice_status = "paid"
+    elif upgrade_request.status in ["rejected", "cancelled", "expired"]:
+        invoice_status = "cancelled"
+    else:
+        invoice_status = "pending"
+
+    return InvoiceData(
+        transaction_number=upgrade_request.transaction.transaction_number if upgrade_request.transaction else upgrade_request.request_number,
+        invoice_date=upgrade_request.created_at,
+        status=invoice_status,
+        paid_at=upgrade_request.applied_at,
+        seller_name="Harmony SaaS",
+        buyer_name=tenant.name,
+        buyer_email=None,
+        description=description,
+        billing_period=upgrade_request.billing_period,
+        amount=upgrade_request.amount,
+        currency=upgrade_request.currency,
+        payment_method_name=payment_method_name,
+    )
+
+
 # ============================================================================
 # ADMIN ROUTES (Super Admin Only)
 # ============================================================================

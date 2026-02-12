@@ -70,6 +70,12 @@ class FileStorageService:
             "path_prefix": "attachments",
             "public": False,
         },
+        FileCategory.PAYMENT_PROOF: {
+            "max_size_mb": 10,
+            "allowed_types": ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"],
+            "path_prefix": "payment-proofs",
+            "public": False,
+        },
     }
 
     def __init__(self, db: Session):
@@ -292,9 +298,19 @@ class FileStorageService:
     async def generate_presigned_download_url(
         self,
         storage_key: str,
-        filename: str
+        filename: str,
+        inline: bool = False
     ) -> Tuple[str, datetime]:
-        """Generate pre-signed URL for file download."""
+        """
+        Generate pre-signed URL for file download.
+
+        Args:
+            storage_key: S3 object key
+            filename: Original filename for Content-Disposition
+            inline: If True, use 'inline' disposition (view in browser).
+                    If False, use 'attachment' disposition (force download).
+        """
+        disposition = 'inline' if inline else 'attachment'
         async with await self.get_s3_client() as s3:
             try:
                 presigned_url = await s3.generate_presigned_url(
@@ -302,7 +318,7 @@ class FileStorageService:
                     Params={
                         'Bucket': settings.S3_BUCKET_NAME,
                         'Key': storage_key,
-                        'ResponseContentDisposition': f'attachment; filename="{filename}"',
+                        'ResponseContentDisposition': f'{disposition}; filename="{filename}"',
                     },
                     ExpiresIn=settings.S3_PRESIGNED_URL_EXPIRY
                 )

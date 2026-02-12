@@ -110,9 +110,15 @@ export const filesAPI = {
 
   /**
    * Get pre-signed download URL for a file
+   * @param fileId - File ID
+   * @param inline - If true, URL will show file inline (view in browser) instead of download
    */
-  getDownloadUrl: async (fileId: string): Promise<FileDownloadResponse> => {
-    return apiClient.get<FileDownloadResponse>(`/files/${fileId}/download`);
+  getDownloadUrl: async (fileId: string, inline?: boolean): Promise<FileDownloadResponse> => {
+    const params = new URLSearchParams();
+    if (inline) params.set('inline', 'true');
+    const queryString = params.toString();
+    const url = queryString ? `/files/${fileId}/download?${queryString}` : `/files/${fileId}/download`;
+    return apiClient.get<FileDownloadResponse>(url);
   },
 
   /**
@@ -236,6 +242,23 @@ export const filesAPI = {
    */
   deleteUserAvatar: async (userId: string): Promise<void> => {
     return apiClient.delete<void>(`/files/users/${userId}/avatar`);
+  },
+
+  // ============================================================================
+  // ADMIN FILE OPERATIONS (Super Admin Only)
+  // ============================================================================
+
+  /**
+   * Get pre-signed download URL for any file (super admin only)
+   * @param fileId - File ID
+   * @param inline - If true, URL will show file inline (view in browser) instead of download
+   */
+  adminGetDownloadUrl: async (fileId: string, inline?: boolean): Promise<FileDownloadResponse> => {
+    const params = new URLSearchParams();
+    if (inline) params.set('inline', 'true');
+    const queryString = params.toString();
+    const url = queryString ? `/files/admin/${fileId}/download?${queryString}` : `/files/admin/${fileId}/download`;
+    return apiClient.get<FileDownloadResponse>(url);
   },
 };
 

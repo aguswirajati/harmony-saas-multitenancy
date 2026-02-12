@@ -197,6 +197,12 @@ export interface UpgradeRequestCreate {
   payment_method_id: string;
 }
 
+export interface UpgradeRequestUpdate {
+  target_tier_code: string;
+  billing_period: BillingPeriod;
+  payment_method_id: string;
+}
+
 export interface UpgradeRequestReview {
   action: 'approve' | 'reject';
   notes?: string;
@@ -271,6 +277,23 @@ export interface TenantUpgradeRequestListResponse {
   total: number;
 }
 
+export interface InvoiceData {
+  transaction_number: string;
+  invoice_date: string;
+  status: 'pending' | 'paid' | 'cancelled';
+  paid_at: string | null;
+  seller_name: string;
+  seller_address: string | null;
+  seller_email: string | null;
+  buyer_name: string;
+  buyer_email: string | null;
+  description: string;
+  billing_period: BillingPeriod;
+  amount: number;
+  currency: string;
+  payment_method_name: string | null;
+}
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -292,21 +315,21 @@ export function formatLimit(value: number, unit: string): string {
 export function getStatusColor(status: UpgradeRequestStatus): string {
   switch (status) {
     case 'pending':
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/30';
     case 'payment_uploaded':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      return 'bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/30';
     case 'under_review':
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
+      return 'bg-purple-100 text-purple-800 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/30';
     case 'approved':
-      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      return 'bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30';
     case 'rejected':
-      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      return 'bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/30';
     case 'cancelled':
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      return 'bg-gray-100 text-gray-800 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-700';
     case 'expired':
-      return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+      return 'bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/30';
     default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      return 'bg-gray-100 text-gray-800 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-700';
   }
 }
 

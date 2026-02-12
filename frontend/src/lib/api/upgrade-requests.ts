@@ -8,11 +8,13 @@ import { apiClient } from './client';
 import type {
   UpgradeRequest,
   UpgradeRequestCreate,
+  UpgradeRequestUpdate,
   UpgradeRequestReview,
   UpgradeRequestListResponse,
   TenantUpgradeRequestListResponse,
   UpgradePreview,
   UpgradeRequestStats,
+  InvoiceData,
 } from '@/types/payment';
 
 // ============================================================================
@@ -71,6 +73,20 @@ export const upgradeRequestsTenantAPI = {
    */
   async cancel(requestId: string): Promise<UpgradeRequest> {
     return apiClient.post<UpgradeRequest>(`/upgrade-requests/${requestId}/cancel`);
+  },
+
+  /**
+   * Update a pending upgrade request
+   */
+  async update(requestId: string, data: UpgradeRequestUpdate): Promise<UpgradeRequest> {
+    return apiClient.put<UpgradeRequest>(`/upgrade-requests/${requestId}`, data);
+  },
+
+  /**
+   * Get invoice data for an upgrade request
+   */
+  async getInvoice(requestId: string): Promise<InvoiceData> {
+    return apiClient.get<InvoiceData>(`/upgrade-requests/${requestId}/invoice`);
   },
 };
 

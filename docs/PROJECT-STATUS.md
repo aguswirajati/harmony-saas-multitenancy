@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-02-12
+> Last updated: 2026-02-12 (Session 15)
 
 ---
 
@@ -58,10 +58,12 @@
 | subscription-tiers (public) | `/api/v1/tiers` | 2 (list public tiers, get tier by code) | Public |
 | payment-methods (admin) | `/api/v1/admin/payment-methods` | 6 (list, get, create, update, delete, set QRIS image) | Super Admin |
 | payment-methods (public) | `/api/v1/payment-methods` | 1 (list available methods) | Authenticated |
-| upgrade-requests (tenant) | `/api/v1/upgrade-requests` | 5 (create, list, get, upload proof, cancel, preview) | Tenant Admin |
-| upgrade-requests (admin) | `/api/v1/admin/upgrade-requests` | 4 (list all, get, review, stats, pending count) | Super Admin |
+| upgrade-requests (tenant) | `/api/v1/upgrade-requests` | 7 (create, list, get, update, upload proof, cancel, preview, invoice) | Tenant Admin |
+| upgrade-requests (admin) | `/api/v1/admin/upgrade-requests` | 5 (list all, get, review, stats, pending count) | Super Admin |
+| files | `/api/v1/files` | 12 (presign upload, confirm, list, get, download, update, delete, storage usage, tenant logo CRUD, user avatar CRUD) | Varies |
+| files (admin) | `/api/v1/files/admin` | 1 (admin download - view any file) | Super Admin |
 
-### Backend: Models (8 concrete + 2 abstract bases)
+### Backend: Models (9 concrete + 2 abstract bases)
 
 | Model | Table | Key Fields |
 |-------|-------|------------|
@@ -71,8 +73,9 @@
 | AuditLog | `audit_logs` | user_id, tenant_id, action, resource, details (JSON), ip_address, request_id |
 | File | `files` | filename, storage_key, content_type, size_bytes, category, tenant_id |
 | SubscriptionTier | `subscription_tiers` | code, display_name, price_monthly, price_yearly, max_users, max_branches, max_storage_gb, features (JSON) |
-| PaymentMethod | `payment_methods` | code, name, type (bank_transfer/qris), bank_name, account_number, qris_image_file_id |
+| PaymentMethod | `payment_methods` | code, name, type (bank_transfer/qris/wallet), bank_name, account_number, qris_image_file_id, wallet_type |
 | UpgradeRequest | `upgrade_requests` | request_number, tenant_id, current/target_tier_code, amount, status, payment_proof_file_id |
+| BillingTransaction | `billing_transactions` | transaction_number, upgrade_request_id, amount, currency, billing_period, status, invoice_date, paid_at |
 | BaseModel | (abstract) | id (UUID), created_at, updated_at, deleted_at, is_active, created_by_id, updated_by_id, deleted_by_id |
 | TenantScopedModel | (abstract) | Inherits BaseModel + tenant_id (CASCADE), branch_id (SET NULL) |
 
@@ -108,7 +111,7 @@
 | SQLInjectionValidator | Detects SQL keywords, comments, injection patterns |
 | XSSValidator | Detects script tags, javascript: protocol, event handlers |
 
-### Frontend: 27 Pages
+### Frontend: 26 Pages
 
 **Public (6 pages)**:
 | Route | Purpose |
@@ -120,7 +123,7 @@
 | `/verify-email` | Verify email with token |
 | `/accept-invite` | Accept user invitation and set password |
 
-**Dashboard - Tenant Users (7 pages)**:
+**Dashboard - Tenant Users (6 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/dashboard` | Stats, usage cards, quick actions |
@@ -128,8 +131,7 @@
 | `/users` | User CRUD with tier limit pre-check |
 | `/settings` | Organization tab + Subscription/usage tab + Format settings tab |
 | `/audit-logs` | Tenant-scoped audit log viewer (admin only) |
-| `/upgrade` | Step-by-step upgrade wizard (tier → billing → payment → confirm) |
-| `/upgrade/history` | View and manage upgrade requests |
+| `/upgrade` | Upgrade wizard + active request management (proof preview, invoice dialog, print/PDF) |
 
 **Admin - Super Admin (14 pages)**:
 | Route | Purpose |
@@ -174,6 +176,7 @@
 | `73458efe5641` | Add audit tracking (created/updated/deleted_by_id), tenant code, TenantScopedModel base |
 | `d8f3a2b5c6e7` | Add file storage (files table, tenant storage tracking) |
 | `e9f4a3b6c7d8` | Add subscription system (subscription_tiers, payment_methods, upgrade_requests) |
+| `g2h4i5j6k7l8` | Add billing transactions table (invoices/receipts for upgrade requests) |
 
 ---
 
@@ -255,12 +258,13 @@ Before this project can be considered a production-ready boilerplate:
 - Notification preferences per user
 - Email notification digests
 
-**File Upload & Storage**
-- S3-compatible file storage service
-- Tenant logo upload
-- User avatar upload
-- Document attachments
-- Storage quota tracking per tenant (model field exists, logic TODO)
+**File Upload & Storage** (Done)
+- ~~S3-compatible file storage service~~ Done (MinIO/S3, presigned URLs, inline/download modes)
+- ~~Tenant logo upload~~ Done (with preview, delete)
+- ~~User avatar upload~~ Done (with preview, delete)
+- ~~Payment proof upload~~ Done (upgrade request workflow)
+- ~~Storage quota tracking per tenant~~ Done (model + enforcement)
+- Document attachments (deferred)
 
 **Theme Switcher** (Done)
 - ~~Dark/light mode toggle~~ Done (ThemeToggle component in sidebar)
@@ -357,5 +361,6 @@ Before this project can be considered a production-ready boilerplate:
 | 12 | 2026-02-04 | React hooks bug fix | Fixed "Rendered fewer hooks than expected" crash on /admin/tools page when toggling dev_mode off - moved all hooks above conditional early return |
 | 13 | 2026-02-07 | SSR fix & Format settings | Fixed Next.js 16 Turbopack SSR prerender error (server/client component split pattern), implemented tenant-level format settings (currency, number, date formatting with live preview) |
 | 14 | 2026-02-12 | Subscription & Payment system | Database-driven subscription tiers (admin CRUD), manual payment system (bank transfer + QRIS), upgrade request workflow (create → proof upload → admin review → apply), 15 new endpoints, 3 new models |
+| 15 | 2026-02-12 | Payment UX & Invoice | Payment proof preview on tenant/admin pages, inline image viewing (no download), fullscreen lightbox, invoice dialog with print/PDF, billing transactions model, e-wallet payment type, tenant logo upload improvements |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

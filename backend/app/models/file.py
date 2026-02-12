@@ -15,6 +15,7 @@ class FileCategory:
     USER_AVATAR = "user_avatar"
     DOCUMENT = "document"
     ATTACHMENT = "attachment"
+    PAYMENT_PROOF = "payment_proof"
 
 
 class File(Base, TenantScopedModel):

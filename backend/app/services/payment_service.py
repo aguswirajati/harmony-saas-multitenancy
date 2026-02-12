@@ -16,6 +16,7 @@ from app.models.upgrade_request import (
     UpgradeRequestStatus,
     BillingPeriod,
 )
+from app.models.billing_transaction import BillingTransaction, TransactionStatus
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.subscription_tier import SubscriptionTier
@@ -275,6 +276,22 @@ class PaymentService:
         )
 
         self.db.add(upgrade_request)
+        self.db.flush()  # Get the ID without committing
+
+        # Create billing transaction
+        transaction = BillingTransaction(
+            tenant_id=tenant_id,
+            transaction_number=BillingTransaction.generate_transaction_number(),
+            upgrade_request_id=upgrade_request.id,
+            amount=amount,
+            currency=target_tier.currency,
+            billing_period=data.billing_period,
+            payment_method_id=data.payment_method_id,
+            status=TransactionStatus.PENDING,
+            description=f"Upgrade from {tenant.tier} to {data.target_tier_code} ({data.billing_period})",
+        )
+        self.db.add(transaction)
+
         self.db.commit()
         self.db.refresh(upgrade_request)
 
@@ -288,6 +305,7 @@ class PaymentService:
             resource_id=upgrade_request.id,
             details={
                 "request_number": upgrade_request.request_number,
+                "transaction_number": transaction.transaction_number,
                 "current_tier": tenant.tier,
                 "target_tier": data.target_tier_code,
                 "amount": amount,
@@ -397,6 +415,10 @@ class PaymentService:
 
         upgrade_request.status = UpgradeRequestStatus.CANCELLED
 
+        # Mark transaction as cancelled
+        if upgrade_request.transaction:
+            upgrade_request.transaction.mark_as_cancelled()
+
         self.db.commit()
         self.db.refresh(upgrade_request)
 
@@ -414,6 +436,86 @@ class PaymentService:
         )
 
         logger.info(f"Upgrade request cancelled: {upgrade_request.request_number}")
+        return upgrade_request
+
+    def update_upgrade_request(
+        self,
+        request_id: UUID,
+        tenant_id: UUID,
+        user_id: UUID,
+        target_tier_code: str,
+        billing_period: str,
+        payment_method_id: UUID,
+        request: Request = None,
+    ) -> UpgradeRequest:
+        """Update an existing pending upgrade request"""
+        upgrade_request = self.get_upgrade_request_by_id(request_id, tenant_id)
+
+        if upgrade_request.status != UpgradeRequestStatus.PENDING:
+            raise BadRequestException(
+                f"Cannot edit request in status '{upgrade_request.status}'"
+            )
+
+        # Validate target tier exists and is different from current
+        target_tier = self.db.query(SubscriptionTier).filter(
+            SubscriptionTier.code == target_tier_code,
+            SubscriptionTier.is_active == True
+        ).first()
+        if not target_tier:
+            raise NotFoundException(f"Tier '{target_tier_code}' not found")
+
+        tenant = self.db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if tenant.tier == target_tier_code:
+            raise BadRequestException("Target tier is the same as current tier")
+
+        # Validate payment method
+        payment_method = self.get_payment_method_by_id(payment_method_id)
+        if not payment_method.is_public or not payment_method.is_active:
+            raise BadRequestException("Selected payment method is not available")
+
+        # Calculate amount
+        if billing_period == BillingPeriod.YEARLY:
+            amount = target_tier.price_yearly
+        else:
+            amount = target_tier.price_monthly
+
+        # Update request
+        upgrade_request.target_tier_code = target_tier_code
+        upgrade_request.billing_period = billing_period
+        upgrade_request.amount = amount
+        upgrade_request.currency = target_tier.currency
+        upgrade_request.payment_method_id = payment_method_id
+
+        # Update transaction
+        if upgrade_request.transaction:
+            upgrade_request.transaction.amount = amount
+            upgrade_request.transaction.currency = target_tier.currency
+            upgrade_request.transaction.billing_period = billing_period
+            upgrade_request.transaction.payment_method_id = payment_method_id
+            upgrade_request.transaction.description = f"Upgrade from {tenant.tier} to {target_tier_code} ({billing_period})"
+
+        self.db.commit()
+        self.db.refresh(upgrade_request)
+
+        # Log audit
+        AuditService.log_action(
+            db=self.db,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            action=AuditAction.UPGRADE_UPDATED,
+            resource="upgrade_request",
+            resource_id=upgrade_request.id,
+            details={
+                "request_number": upgrade_request.request_number,
+                "target_tier": target_tier_code,
+                "amount": amount,
+                "billing_period": billing_period,
+            },
+            status=AuditStatus.SUCCESS,
+            request=request,
+        )
+
+        logger.info(f"Updated upgrade request: {upgrade_request.request_number}")
         return upgrade_request
 
     # ========================================================================
@@ -465,10 +567,19 @@ class PaymentService:
             # Apply the upgrade
             self._apply_upgrade(upgrade_request)
 
+            # Mark transaction as paid
+            if upgrade_request.transaction:
+                upgrade_request.transaction.mark_as_paid()
+
             audit_action = AuditAction.UPGRADE_APPROVED
         else:
             upgrade_request.status = UpgradeRequestStatus.REJECTED
             upgrade_request.rejection_reason = data.rejection_reason
+
+            # Mark transaction as cancelled
+            if upgrade_request.transaction:
+                upgrade_request.transaction.mark_as_cancelled()
+
             audit_action = AuditAction.UPGRADE_REJECTED
 
         self.db.commit()

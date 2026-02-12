@@ -18,7 +18,16 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CheckCircle2, Building2 } from 'lucide-react';
+import { Loader2, CheckCircle2, Building2, X, ImagePlus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 // Form validation schema
@@ -37,6 +46,8 @@ type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export default function OrganizationSettingsPage() {
   const queryClient = useQueryClient();
+  const [showLogoDialog, setShowLogoDialog] = useState(false);
+  const [logoUrlInput, setLogoUrlInput] = useState('');
 
   // Fetch current tenant
   const { data: tenant, isLoading } = useQuery({
@@ -150,28 +161,53 @@ export default function OrganizationSettingsPage() {
               </p>
             </div>
 
-            {/* Logo URL */}
+            {/* Logo */}
             <div className="space-y-2">
-              <Label htmlFor="logo_url">Logo URL (Optional)</Label>
-              <Input
-                id="logo_url"
-                type="url"
-                {...register('logo_url')}
-                placeholder="https://example.com/logo.png"
-              />
+              <Label>Organization Logo (Optional)</Label>
+              <input type="hidden" {...register('logo_url')} />
+              <div className="flex items-center gap-4">
+                <div className="relative group">
+                  {/* Clickable logo area */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLogoUrlInput(tenant?.logo_url || '');
+                      setShowLogoDialog(true);
+                    }}
+                    className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-primary hover:bg-primary/5 transition-colors flex items-center justify-center overflow-hidden cursor-pointer"
+                  >
+                    {tenant?.logo_url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={tenant.logo_url}
+                        alt="Organization logo"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <ImagePlus className="w-8 h-8 text-gray-400" />
+                    )}
+                  </button>
+                  {/* X button to remove */}
+                  {tenant?.logo_url && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Clear the logo URL by submitting the form with empty value
+                        mutation.mutate({ ...tenant, logo_url: '' });
+                      }}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-sm transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Click to {tenant?.logo_url ? 'change' : 'add'} logo
+                </p>
+              </div>
               {errors.logo_url && (
                 <p className="text-sm text-red-600">{errors.logo_url.message}</p>
-              )}
-              {tenant?.logo_url && (
-                <div className="mt-2">
-                  <p className="text-xs text-muted-foreground mb-2">Current logo:</p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={tenant.logo_url}
-                    alt="Organization logo"
-                    className="h-12 w-auto rounded border"
-                  />
-                </div>
               )}
             </div>
           </CardContent>
@@ -288,6 +324,68 @@ export default function OrganizationSettingsPage() {
           </Button>
         </div>
       </form>
+
+      {/* Logo URL Dialog */}
+      <Dialog open={showLogoDialog} onOpenChange={setShowLogoDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Organization Logo</DialogTitle>
+            <DialogDescription>
+              Enter the URL of your organization&apos;s logo image.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="logo-url-input">Logo URL</Label>
+              <Input
+                id="logo-url-input"
+                type="url"
+                value={logoUrlInput}
+                onChange={(e) => setLogoUrlInput(e.target.value)}
+                placeholder="https://example.com/logo.png"
+              />
+            </div>
+            {logoUrlInput && (
+              <div className="space-y-2">
+                <Label>Preview</Label>
+                <div className="w-20 h-20 rounded-lg border flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-800">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={logoUrlInput}
+                    alt="Logo preview"
+                    className="max-w-full max-h-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowLogoDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                mutation.mutate({ ...tenant, logo_url: logoUrlInput || '' });
+                setShowLogoDialog(false);
+              }}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Save Logo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

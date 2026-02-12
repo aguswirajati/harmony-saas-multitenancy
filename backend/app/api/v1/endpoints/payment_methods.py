@@ -289,6 +289,7 @@ def list_available_payment_methods(
             bank_name=method.bank_name,
             account_number=method.account_number,
             account_name=method.account_name,
+            wallet_type=method.wallet_type,
             qris_image_url=None,  # TODO: Get URL from file service
             instructions=method.instructions,
         )

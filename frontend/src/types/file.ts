@@ -1,4 +1,4 @@
-export type FileCategory = 'tenant_logo' | 'user_avatar' | 'document' | 'attachment';
+export type FileCategory = 'tenant_logo' | 'user_avatar' | 'document' | 'attachment' | 'payment_proof';
 
 export interface FileUploadRequest {
   filename: string;

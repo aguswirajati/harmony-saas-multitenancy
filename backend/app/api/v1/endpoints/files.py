@@ -11,11 +11,11 @@ import math
 from app.core.database import get_db
 from app.api.deps import (
     get_current_user, get_current_active_user, get_current_tenant,
-    get_admin_user, get_tenant_context, require_permission
+    get_admin_user, get_tenant_context, require_permission, get_super_admin_user
 )
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.models.file import FileCategory
+from app.models.file import FileCategory, File
 from app.models.audit_log import AuditAction
 from app.core.permissions import Permission
 from app.core.exceptions import (
@@ -238,6 +238,7 @@ async def get_file(
 @router.get("/{file_id}/download", response_model=FileDownloadResponse)
 async def get_download_url(
     file_id: UUID,
+    inline: bool = Query(False, description="If true, return URL for viewing in browser instead of download"),
     current_user: User = Depends(require_permission(Permission.FILES_VIEW)),
     tenant: Tenant = Depends(get_tenant_context),
     db: Session = Depends(get_db)
@@ -251,7 +252,8 @@ async def get_download_url(
 
     download_url, expires_at = await service.generate_presigned_download_url(
         file.storage_key,
-        file.filename
+        file.filename,
+        inline=inline
     )
 
     return FileDownloadResponse(
@@ -675,3 +677,46 @@ async def delete_user_avatar(
             details=file_info,
             request=request
         )
+
+
+# ============================================================================
+# ADMIN FILE ENDPOINTS (Super Admin Only)
+# ============================================================================
+
+@router.get("/admin/{file_id}/download", response_model=FileDownloadResponse)
+async def admin_get_download_url(
+    file_id: UUID,
+    inline: bool = Query(False, description="If true, return URL for viewing in browser instead of download"),
+    current_user: User = Depends(get_super_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get pre-signed download URL for any file (super admin only).
+
+    Used by super admins to view payment proofs and other tenant files
+    during review processes.
+    """
+    service = FileStorageService(db)
+
+    # Get file without tenant filtering for super admin
+    file = db.query(File).filter(
+        File.id == file_id,
+        File.is_active == True
+    ).first()
+
+    if not file:
+        raise NotFoundException("File not found")
+
+    download_url, expires_at = await service.generate_presigned_download_url(
+        file.storage_key,
+        file.filename,
+        inline=inline
+    )
+
+    return FileDownloadResponse(
+        download_url=download_url,
+        filename=file.filename,
+        content_type=file.content_type,
+        size_bytes=file.size_bytes,
+        expires_at=expires_at
+    )

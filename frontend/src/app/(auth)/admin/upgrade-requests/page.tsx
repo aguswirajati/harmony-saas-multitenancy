@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { upgradeRequestsAPI } from '@/lib/api/upgrade-requests';
+import { filesAPI } from '@/lib/api/files';
 import {
   Table,
   TableBody,
@@ -63,9 +64,12 @@ export default function UpgradeRequestsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<UpgradeRequest | null>(null);
+  const [paymentProofUrl, setPaymentProofUrl] = useState<string | null>(null);
+  const [isLoadingProof, setIsLoadingProof] = useState(false);
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject'>('approve');
   const [reviewNotes, setReviewNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
+  const [showProofPreview, setShowProofPreview] = useState(false);
 
   const params = {
     skip: (page - 1) * pageSize,
@@ -113,8 +117,22 @@ export default function UpgradeRequestsPage() {
     try {
       const request = await upgradeRequestsAPI.admin.get(summary.id);
       setSelectedRequest(request);
+      setPaymentProofUrl(null);
       resetReviewForm();
       setIsReviewDialogOpen(true);
+
+      // Fetch payment proof URL if available (inline=true to view in browser)
+      if (request.payment_proof_file_id) {
+        setIsLoadingProof(true);
+        try {
+          const downloadResponse = await filesAPI.adminGetDownloadUrl(request.payment_proof_file_id, true);
+          setPaymentProofUrl(downloadResponse.download_url);
+        } catch {
+          console.error('Failed to load payment proof');
+        } finally {
+          setIsLoadingProof(false);
+        }
+      }
     } catch {
       toast.error('Failed to load request details');
     }
@@ -432,16 +450,27 @@ export default function UpgradeRequestsPage() {
                   <Label className="text-muted-foreground mb-2 block">
                     Payment Proof
                   </Label>
-                  {selectedRequest.payment_proof_url ? (
-                    <img
-                      src={selectedRequest.payment_proof_url}
-                      alt="Payment Proof"
-                      className="max-h-64 rounded-lg"
-                    />
+                  {isLoadingProof ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      <span>Loading payment proof...</span>
+                    </div>
+                  ) : paymentProofUrl ? (
+                    <div
+                      onClick={() => setShowProofPreview(true)}
+                      className="cursor-pointer"
+                    >
+                      <img
+                        src={paymentProofUrl}
+                        alt="Payment Proof"
+                        className="max-h-64 rounded-lg hover:opacity-90 transition-opacity"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Click to view full size</p>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <FileImage className="h-5 w-5" />
-                      <span>Payment proof uploaded</span>
+                      <span>Payment proof uploaded (preview unavailable)</span>
                     </div>
                   )}
                   {selectedRequest.payment_proof_uploaded_at && (
@@ -546,6 +575,20 @@ export default function UpgradeRequestsPage() {
               </Button>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Proof Full Size Preview */}
+      <Dialog open={showProofPreview} onOpenChange={setShowProofPreview}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-2 flex items-center justify-center" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Payment Proof Preview</DialogTitle>
+          {paymentProofUrl && (
+            <img
+              src={paymentProofUrl}
+              alt="Payment Proof"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

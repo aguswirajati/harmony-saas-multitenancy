@@ -76,18 +76,18 @@ class PaymentMethodResponse(BaseModel):
     code: str
     name: str
     type: str
-    bank_name: Optional[str]
-    account_number: Optional[str]
-    account_name: Optional[str]
-    wallet_type: Optional[str]
-    qris_image_file_id: Optional[UUID]
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    account_name: Optional[str] = None
+    wallet_type: Optional[str] = None
+    qris_image_file_id: Optional[UUID] = None
     qris_image_url: Optional[str] = None
-    instructions: Optional[str]
+    instructions: Optional[str] = None
     sort_order: int
     is_public: bool
     is_active: bool
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -119,12 +119,12 @@ class PublicPaymentMethodResponse(BaseModel):
     code: str
     name: str
     type: str
-    bank_name: Optional[str]
-    account_number: Optional[str]
-    account_name: Optional[str]
-    wallet_type: Optional[str]
-    qris_image_url: Optional[str]
-    instructions: Optional[str]
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    account_name: Optional[str] = None
+    wallet_type: Optional[str] = None
+    qris_image_url: Optional[str] = None
+    instructions: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -311,3 +311,62 @@ class UpgradeRequestStats(BaseModel):
     rejected_this_month: int
     total_revenue_this_month: int
     currency: str
+
+
+# ============================================================================
+# BILLING TRANSACTION SCHEMAS
+# ============================================================================
+
+class BillingTransactionResponse(BaseModel):
+    """Billing transaction response"""
+    id: UUID
+    transaction_number: str
+    tenant_id: UUID
+    upgrade_request_id: UUID
+    amount: int
+    currency: str
+    billing_period: str
+    payment_method_id: Optional[UUID] = None
+    payment_method_name: Optional[str] = None
+    status: str
+    invoice_date: datetime
+    paid_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BillingTransactionListResponse(BaseModel):
+    """List of billing transactions"""
+    items: List[BillingTransactionResponse]
+    total: int
+
+
+class InvoiceData(BaseModel):
+    """Data for invoice generation"""
+    # Transaction info
+    transaction_number: str
+    invoice_date: datetime
+    status: str  # pending, paid
+    paid_at: Optional[datetime] = None
+
+    # Seller info (system)
+    seller_name: str = "Harmony SaaS"
+    seller_address: Optional[str] = None
+    seller_email: Optional[str] = None
+
+    # Buyer info (tenant)
+    buyer_name: str
+    buyer_email: Optional[str] = None
+
+    # Line items
+    description: str
+    billing_period: str
+    amount: int
+    currency: str
+
+    # Payment info
+    payment_method_name: Optional[str] = None

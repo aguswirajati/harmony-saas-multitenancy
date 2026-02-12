@@ -203,6 +203,7 @@ class AuditAction:
 
     # Upgrade Requests
     UPGRADE_REQUESTED = "upgrade.requested"
+    UPGRADE_UPDATED = "upgrade.updated"
     UPGRADE_PROOF_UPLOADED = "upgrade.proof_uploaded"
     UPGRADE_APPROVED = "upgrade.approved"
     UPGRADE_REJECTED = "upgrade.rejected"

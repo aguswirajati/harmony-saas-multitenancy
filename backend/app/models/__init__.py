@@ -8,6 +8,7 @@ from app.models.file import File, FileCategory
 from app.models.subscription_tier import SubscriptionTier
 from app.models.payment_method import PaymentMethod, PaymentMethodType
 from app.models.upgrade_request import UpgradeRequest, UpgradeRequestStatus, BillingPeriod
+from app.models.billing_transaction import BillingTransaction, TransactionStatus
 
 # Export all models
 __all__ = [
@@ -25,4 +26,6 @@ __all__ = [
     "UpgradeRequest",
     "UpgradeRequestStatus",
     "BillingPeriod",
+    "BillingTransaction",
+    "TransactionStatus",
 ]

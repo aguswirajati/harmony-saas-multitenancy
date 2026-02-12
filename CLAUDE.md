@@ -7,9 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 1 (Critical Foundation): 100% complete.**
 
 What's built:
-- 72 API endpoints across 14 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests)
-- 27 frontend pages (6 public, 7 dashboard, 14 admin)
-- 8 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest) + BaseModel and TenantScopedModel abstract bases
+- 90+ API endpoints across 16 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests, files)
+- 26 frontend pages (6 public, 6 dashboard, 14 admin)
+- 9 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest, BillingTransaction) + BaseModel and TenantScopedModel abstract bases
 - 8 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment)
 - 3 middleware (rate limiter, error handler, request logger)
 - 6 input validators (password, subdomain, email, name, SQL injection, XSS)
@@ -19,14 +19,16 @@ What's built:
 - Developer mode tools (DEV_MODE flag, dev toolbar, runtime settings, system info, app log viewer)
 - Format settings (tenant-level currency, number, date formatting with live preview)
 - Database-driven subscription tiers (admin CRUD, replaces hardcoded config)
-- Manual payment system (bank transfer + QRIS, proof upload, admin review workflow)
+- Manual payment system (bank transfer + QRIS + e-wallet, proof upload, admin review workflow)
+- File storage system (S3/MinIO, presigned URLs, tenant logo, user avatar, payment proof)
+- Invoice/receipt generation with print/PDF support
 - Performance benchmark script
 - 73 backend tests (tenant isolation, auth, services, authorization) - all passing
 - 20 Playwright E2E tests passing + 2 fixme (registration, login, dashboard, navigation)
 - Docker setup (Dockerfiles + docker-compose for local dev)
 - CI/CD (GitHub Actions for backend lint/test, frontend lint/build/e2e)
 
-What's NOT built yet (Phase 2+): notifications, file upload, i18n, online payment integration (Stripe/Midtrans).
+What's NOT built yet (Phase 2+): notifications, i18n, online payment integration (Stripe/Midtrans).
 
 For full status details, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
 

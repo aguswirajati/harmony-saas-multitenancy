@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any, Literal
 # FILE CATEGORY LITERALS
 # ============================================================================
 
-FileCategory = Literal["tenant_logo", "user_avatar", "document", "attachment"]
+FileCategory = Literal["tenant_logo", "user_avatar", "document", "attachment", "payment_proof"]
 
 
 # ============================================================================

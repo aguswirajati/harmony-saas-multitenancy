@@ -4,7 +4,6 @@ import * as React from 'react';
 import { useCallback } from 'react';
 import { Building2, Camera, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useTenantLogo } from '@/hooks/use-file-upload';
 
@@ -95,91 +94,74 @@ export function TenantLogoUpload({
   const isLoading = isUploading || isDeleting;
 
   return (
-    <div className={cn('space-y-4', className)}>
-      <div className="flex items-start gap-6">
-        {/* Logo Preview */}
-        <div
-          onClick={handleClick}
-          className={cn(
-            'relative h-24 w-24 flex-shrink-0 rounded-lg border-2 border-dashed overflow-hidden cursor-pointer group transition-colors',
-            'border-muted-foreground/25 hover:border-muted-foreground/50',
-            (disabled || isLoading) && 'cursor-not-allowed opacity-50'
-          )}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="hidden"
-            disabled={disabled || isLoading}
-          />
-
-          {displayUrl ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={displayUrl}
-                alt={tenantName || 'Organization logo'}
-                className="h-full w-full object-contain"
-              />
-              {/* Hover overlay */}
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Camera className="h-6 w-6 text-white" />
-              </div>
-            </>
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors">
-              <Building2 className="h-8 w-8 mb-1" />
-              <span className="text-xs">Add logo</span>
-            </div>
-          )}
-
-          {/* Loading overlay */}
-          {isLoading && (
-            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          )}
-        </div>
-
-        {/* Info and Actions */}
-        <div className="flex-1 space-y-2">
-          <div>
-            <h4 className="text-sm font-medium">Organization Logo</h4>
-            <p className="text-xs text-muted-foreground">
-              Recommended: Square image, at least 200x200px. Max 5MB.
-            </p>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleClick}
+    <div className={cn('space-y-2', className)}>
+      <div className="flex items-center gap-4">
+        {/* Logo Preview with X button */}
+        <div className="relative group">
+          <div
+            onClick={handleClick}
+            className={cn(
+              'relative h-20 w-20 rounded-lg border-2 border-dashed overflow-hidden cursor-pointer transition-colors',
+              'border-muted-foreground/25 hover:border-primary hover:bg-primary/5',
+              (disabled || isLoading) && 'cursor-not-allowed opacity-50'
+            )}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
               disabled={disabled || isLoading}
-            >
-              {displayUrl ? 'Change' : 'Upload'}
-            </Button>
-            {displayUrl && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleRemove}
-                disabled={disabled || isLoading}
-                className="text-destructive hover:text-destructive"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Remove
-              </Button>
+            />
+
+            {displayUrl ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={displayUrl}
+                  alt={tenantName || 'Organization logo'}
+                  className="h-full w-full object-contain"
+                />
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Camera className="h-6 w-6 text-white" />
+                </div>
+              </>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors">
+                <Building2 className="h-8 w-8" />
+              </div>
+            )}
+
+            {/* Loading overlay */}
+            {isLoading && (
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
             )}
           </div>
 
+          {/* X button to remove */}
+          {displayUrl && !isLoading && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              disabled={disabled}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-destructive hover:bg-destructive/90 text-white rounded-full flex items-center justify-center shadow-sm transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1">
+          <p className="text-sm text-muted-foreground">
+            Click to {displayUrl ? 'change' : 'add'} logo
+          </p>
           {/* Progress bar */}
           {isUploading && (
-            <div className="space-y-1">
+            <div className="mt-2 space-y-1">
               <Progress value={uploadProgress} className="h-1" />
               <p className="text-xs text-muted-foreground">{uploadProgress}% uploaded</p>
             </div>

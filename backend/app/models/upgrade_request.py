@@ -175,6 +175,7 @@ class UpgradeRequest(Base, TenantScopedModel):
     payment_proof = relationship("File", foreign_keys=[payment_proof_file_id])
     reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
     requested_by = relationship("User", foreign_keys=[requested_by_id])
+    transaction = relationship("BillingTransaction", back_populates="upgrade_request", uselist=False)
 
     # Composite indexes for common queries
     __table_args__ = (
