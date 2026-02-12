@@ -45,6 +45,34 @@ export interface AuditLogParams {
   search?: string;
 }
 
+export interface ArchiveFile {
+  name: string;
+  size_bytes: number;
+  size_readable: string;
+}
+
+export interface ArchiveResult {
+  message: string;
+  archived: number;
+  before_date: string;
+  file: ArchiveFile | null;
+}
+
+export interface ArchiveInfo {
+  name: string;
+  size_bytes: number;
+  size_readable: string;
+  created_at: string;
+  total_records: number;
+  archived_at: string | null;
+  before_date: string | null;
+}
+
+export interface ArchiveListResponse {
+  archives: ArchiveInfo[];
+  total: number;
+}
+
 export const auditAPI = {
   /**
    * Get paginated list of audit logs with optional filters
@@ -106,10 +134,32 @@ export const auditAPI = {
 
   /**
    * Archive old audit logs before a given date
+   * Exports logs to JSON file, then deletes from database
    */
-  archiveLogs: async (beforeDate?: string): Promise<{ message: string; archived: number; before_date: string }> => {
+  archiveLogs: async (beforeDate?: string): Promise<ArchiveResult> => {
     const params = beforeDate ? `?before_date=${encodeURIComponent(beforeDate)}` : '';
-    return apiClient.post<{ message: string; archived: number; before_date: string }>(`/admin/audit-logs/archive${params}`);
+    return apiClient.post<ArchiveResult>(`/admin/audit-logs/archive${params}`);
+  },
+
+  /**
+   * List all archived audit log files
+   */
+  listArchives: async (): Promise<ArchiveListResponse> => {
+    return apiClient.get<ArchiveListResponse>('/admin/audit-logs/archives');
+  },
+
+  /**
+   * Get download URL for an archive file
+   */
+  getArchiveDownloadUrl: (filename: string): string => {
+    return `/api/v1/admin/audit-logs/archives/${encodeURIComponent(filename)}`;
+  },
+
+  /**
+   * Delete an archive file (DEV MODE only)
+   */
+  deleteArchive: async (filename: string): Promise<{ message: string }> => {
+    return apiClient.delete<{ message: string }>(`/admin/audit-logs/archives/${encodeURIComponent(filename)}`);
   },
 };
 

@@ -6,11 +6,15 @@ tenant admins see only their own tenant's logs. Access is controlled via
 the AUDIT_VIEW permission.
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 from typing import Optional, List
 from datetime import datetime, timedelta
 from uuid import UUID
+import json
+import os
+from pathlib import Path
 
 from fastapi import Request
 from app.core.database import get_db
@@ -25,6 +29,10 @@ from app.schemas.audit import (
     AuditLogListResponse,
     AuditStatistics,
 )
+
+# Archive directory
+ARCHIVE_DIR = Path("archives/audit")
+ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(prefix="/admin/audit-logs", tags=["Admin - Audit"])
 
@@ -272,18 +280,75 @@ def archive_audit_logs(
     current_user: User = Depends(get_super_admin_user),
 ):
     """
-    Archive (delete) old audit logs before a given date.
+    Archive old audit logs before a given date.
 
     Super Admin only. Works in both dev and production mode.
     Default cutoff is 90 days ago.
+
+    This will:
+    1. Export matching logs to a JSON file in archives/audit/
+    2. Delete the logs from the database
+    3. Return info about the created archive file
     """
     cutoff = before_date or (datetime.utcnow() - timedelta(days=90))
 
-    count = (
+    # Query logs to archive
+    logs_to_archive = (
         db.query(AuditLog)
         .filter(AuditLog.created_at < cutoff)
-        .delete(synchronize_session="fetch")
+        .order_by(AuditLog.created_at.asc())
+        .all()
     )
+
+    count = len(logs_to_archive)
+
+    if count == 0:
+        return {
+            "message": "No logs found to archive",
+            "archived": 0,
+            "before_date": cutoff.isoformat(),
+            "file": None,
+        }
+
+    # Prepare data for JSON export
+    archive_data = {
+        "archived_at": datetime.utcnow().isoformat(),
+        "archived_by": current_user.email,
+        "before_date": cutoff.isoformat(),
+        "total_records": count,
+        "logs": [],
+    }
+
+    for log in logs_to_archive:
+        archive_data["logs"].append({
+            "id": str(log.id),
+            "user_id": str(log.user_id) if log.user_id else None,
+            "tenant_id": str(log.tenant_id) if log.tenant_id else None,
+            "action": log.action,
+            "resource": log.resource,
+            "resource_id": str(log.resource_id) if log.resource_id else None,
+            "details": log.details,
+            "status": log.status,
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "request_id": log.request_id,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        })
+
+    # Generate filename with timestamp
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"audit_archive_{timestamp}.json"
+    filepath = ARCHIVE_DIR / filename
+
+    # Write to file
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(archive_data, f, indent=2, ensure_ascii=False)
+
+    # Get file size
+    file_size = os.path.getsize(filepath)
+
+    # Delete archived logs from database
+    db.query(AuditLog).filter(AuditLog.created_at < cutoff).delete(synchronize_session="fetch")
     db.commit()
 
     AuditService.log_action(
@@ -292,12 +357,155 @@ def archive_audit_logs(
         tenant_id=None,
         action="system.audit_logs_archived",
         resource="audit_log",
-        details={"records_archived": count, "before_date": cutoff.isoformat()},
+        details={
+            "records_archived": count,
+            "before_date": cutoff.isoformat(),
+            "archive_file": filename,
+            "file_size_bytes": file_size,
+        },
         status=AuditStatus.SUCCESS,
         request=request,
     )
 
-    return {"message": "Audit logs archived", "archived": count, "before_date": cutoff.isoformat()}
+    return {
+        "message": f"Successfully archived {count} audit logs",
+        "archived": count,
+        "before_date": cutoff.isoformat(),
+        "file": {
+            "name": filename,
+            "size_bytes": file_size,
+            "size_readable": _format_file_size(file_size),
+        },
+    }
+
+
+def _format_file_size(size_bytes: int) -> str:
+    """Format file size in human-readable format."""
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f} TB"
+
+
+@router.get("/archives")
+def list_archive_files(
+    current_user: User = Depends(get_super_admin_user),
+):
+    """
+    List all archived audit log files.
+
+    Super Admin only.
+    """
+    archives = []
+
+    if ARCHIVE_DIR.exists():
+        for filepath in sorted(ARCHIVE_DIR.glob("*.json"), reverse=True):
+            stat = filepath.stat()
+            # Try to read metadata from file
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    total_records = data.get("total_records", 0)
+                    archived_at = data.get("archived_at", None)
+                    before_date = data.get("before_date", None)
+            except Exception:
+                total_records = 0
+                archived_at = None
+                before_date = None
+
+            archives.append({
+                "name": filepath.name,
+                "size_bytes": stat.st_size,
+                "size_readable": _format_file_size(stat.st_size),
+                "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "total_records": total_records,
+                "archived_at": archived_at,
+                "before_date": before_date,
+            })
+
+    return {"archives": archives, "total": len(archives)}
+
+
+@router.get("/archives/{filename}")
+def download_archive_file(
+    filename: str,
+    current_user: User = Depends(get_super_admin_user),
+):
+    """
+    Download an archived audit log file.
+
+    Super Admin only.
+    """
+    # Validate filename to prevent directory traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+
+    filepath = ARCHIVE_DIR / filename
+
+    if not filepath.exists() or not filepath.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archive file not found",
+        )
+
+    return FileResponse(
+        path=filepath,
+        filename=filename,
+        media_type="application/json",
+    )
+
+
+@router.delete("/archives/{filename}")
+def delete_archive_file(
+    filename: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_super_admin_user),
+):
+    """
+    Delete an archived audit log file.
+
+    Super Admin only. DEV_MODE only.
+    """
+    if not settings.DEV_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Deleting archive files is only allowed in DEV_MODE",
+        )
+
+    # Validate filename
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+
+    filepath = ARCHIVE_DIR / filename
+
+    if not filepath.exists() or not filepath.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archive file not found",
+        )
+
+    os.remove(filepath)
+
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        tenant_id=None,
+        action="system.archive_file_deleted",
+        resource="audit_archive",
+        details={"filename": filename},
+        status=AuditStatus.SUCCESS,
+        request=request,
+    )
+
+    return {"message": f"Archive file '{filename}' deleted"}
 
 
 @router.get("/{log_id}", response_model=AuditLogResponse)

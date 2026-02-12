@@ -63,6 +63,7 @@ frontend/blob-report/
 backend/__pycache__/
 backend/.pytest_cache/
 backend/uploads/
+backend/archives/
 backend/*.pyc
 backend/*.py[cod]
 backend/.*py[cod]
