@@ -142,7 +142,9 @@ export default function PaymentMethodsPage() {
   const openEditDialog = (method: PaymentMethod) => {
     setSelectedMethod(method);
     setFormData({
+      code: method.code,
       name: method.name,
+      type: method.type,
       bank_name: method.bank_name || '',
       account_number: method.account_number || '',
       account_name: method.account_name || '',
@@ -332,7 +334,7 @@ export default function PaymentMethodsPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Basic Info */}
+            {/* Basic Info - Create Mode */}
             {!selectedMethod && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -363,6 +365,25 @@ export default function PaymentMethodsPage() {
                       <SelectItem value="qris">QRIS</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+            )}
+
+            {/* Basic Info - Edit Mode (Read-only code and type) */}
+            {selectedMethod && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Code</Label>
+                  <div className="flex items-center h-10 px-3 rounded-md border bg-muted font-mono text-sm">
+                    {formData.code}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Type</Label>
+                  <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted text-sm">
+                    {getTypeIcon(formData.type as PaymentMethodType)}
+                    {getPaymentTypeLabel(formData.type as PaymentMethodType)}
+                  </div>
                 </div>
               </div>
             )}
@@ -422,10 +443,11 @@ export default function PaymentMethodsPage() {
             )}
 
             {/* QRIS Info */}
-            {formData.type === 'qris' && !selectedMethod && (
+            {formData.type === 'qris' && (
               <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-4 text-sm text-blue-700 dark:text-blue-400">
-                After creating the QRIS payment method, you can upload the QRIS image
-                using the file upload feature.
+                {selectedMethod
+                  ? 'To update the QRIS image, use the file upload feature separately.'
+                  : 'After creating the QRIS payment method, you can upload the QRIS image using the file upload feature.'}
               </div>
             )}
 
