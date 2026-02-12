@@ -18,8 +18,9 @@ from pathlib import Path
 
 from fastapi import Request
 from app.core.database import get_db
-from app.api.deps import require_permission, get_super_admin_user
+from app.api.deps import require_permission, get_super_admin_user, get_current_tenant
 from app.core.permissions import Permission
+from app.models.tenant import Tenant
 from app.config import settings
 from app.models.user import User
 from app.models.audit_log import AuditLog, AuditAction, AuditStatus
@@ -533,3 +534,202 @@ def get_audit_log(
         )
 
     return AuditLogResponse.from_audit_log(audit_log)
+
+
+# ============================================================================
+# TENANT-SCOPED ARCHIVE ENDPOINTS
+# ============================================================================
+
+def _get_tenant_archive_dir(tenant_id: UUID) -> Path:
+    """Get archive directory for a specific tenant."""
+    tenant_dir = ARCHIVE_DIR / f"tenant_{tenant_id}"
+    tenant_dir.mkdir(parents=True, exist_ok=True)
+    return tenant_dir
+
+
+@router.post("/tenant/archive")
+def archive_tenant_audit_logs(
+    request: Request,
+    before_date: Optional[datetime] = Query(
+        None, description="Archive logs older than this date (default: 90 days ago)"
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.AUDIT_VIEW)),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Archive old audit logs for current tenant.
+
+    Tenant Admin only. Exports logs to JSON file, then removes from database.
+    Default cutoff is 90 days ago.
+    """
+    cutoff = before_date or (datetime.utcnow() - timedelta(days=90))
+
+    # Query logs to archive (tenant-scoped)
+    logs_to_archive = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.tenant_id == tenant.id,
+            AuditLog.created_at < cutoff,
+        )
+        .order_by(AuditLog.created_at.asc())
+        .all()
+    )
+
+    count = len(logs_to_archive)
+
+    if count == 0:
+        return {
+            "message": "No logs found to archive",
+            "archived": 0,
+            "before_date": cutoff.isoformat(),
+            "file": None,
+        }
+
+    # Prepare data for JSON export
+    archive_data = {
+        "archived_at": datetime.utcnow().isoformat(),
+        "archived_by": current_user.email,
+        "tenant_id": str(tenant.id),
+        "tenant_name": tenant.name,
+        "before_date": cutoff.isoformat(),
+        "total_records": count,
+        "logs": [],
+    }
+
+    for log in logs_to_archive:
+        archive_data["logs"].append({
+            "id": str(log.id),
+            "user_id": str(log.user_id) if log.user_id else None,
+            "action": log.action,
+            "resource": log.resource,
+            "resource_id": str(log.resource_id) if log.resource_id else None,
+            "details": log.details,
+            "status": log.status,
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "request_id": log.request_id,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        })
+
+    # Generate filename with timestamp
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"audit_archive_{timestamp}.json"
+    tenant_archive_dir = _get_tenant_archive_dir(tenant.id)
+    filepath = tenant_archive_dir / filename
+
+    # Write to file
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(archive_data, f, indent=2, ensure_ascii=False)
+
+    # Get file size
+    file_size = os.path.getsize(filepath)
+
+    # Delete archived logs from database (tenant-scoped)
+    db.query(AuditLog).filter(
+        AuditLog.tenant_id == tenant.id,
+        AuditLog.created_at < cutoff,
+    ).delete(synchronize_session="fetch")
+    db.commit()
+
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        tenant_id=tenant.id,
+        action="system.audit_logs_archived",
+        resource="audit_log",
+        details={
+            "records_archived": count,
+            "before_date": cutoff.isoformat(),
+            "archive_file": filename,
+            "file_size_bytes": file_size,
+        },
+        status=AuditStatus.SUCCESS,
+        request=request,
+    )
+
+    return {
+        "message": f"Successfully archived {count} audit logs",
+        "archived": count,
+        "before_date": cutoff.isoformat(),
+        "file": {
+            "name": filename,
+            "size_bytes": file_size,
+            "size_readable": _format_file_size(file_size),
+        },
+    }
+
+
+@router.get("/tenant/archives")
+def list_tenant_archive_files(
+    current_user: User = Depends(require_permission(Permission.AUDIT_VIEW)),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    List archived audit log files for current tenant.
+
+    Tenant Admin only.
+    """
+    archives = []
+    tenant_archive_dir = _get_tenant_archive_dir(tenant.id)
+
+    if tenant_archive_dir.exists():
+        for filepath in sorted(tenant_archive_dir.glob("*.json"), reverse=True):
+            stat = filepath.stat()
+            # Try to read metadata from file
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    total_records = data.get("total_records", 0)
+                    archived_at = data.get("archived_at", None)
+                    before_date = data.get("before_date", None)
+            except Exception:
+                total_records = 0
+                archived_at = None
+                before_date = None
+
+            archives.append({
+                "name": filepath.name,
+                "size_bytes": stat.st_size,
+                "size_readable": _format_file_size(stat.st_size),
+                "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "total_records": total_records,
+                "archived_at": archived_at,
+                "before_date": before_date,
+            })
+
+    return {"archives": archives, "total": len(archives)}
+
+
+@router.get("/tenant/archives/{filename}")
+def download_tenant_archive_file(
+    filename: str,
+    current_user: User = Depends(require_permission(Permission.AUDIT_VIEW)),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Download an archived audit log file for current tenant.
+
+    Tenant Admin only.
+    """
+    # Validate filename to prevent directory traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+
+    tenant_archive_dir = _get_tenant_archive_dir(tenant.id)
+    filepath = tenant_archive_dir / filename
+
+    if not filepath.exists() or not filepath.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archive file not found",
+        )
+
+    return FileResponse(
+        path=filepath,
+        filename=filename,
+        media_type="application/json",
+    )

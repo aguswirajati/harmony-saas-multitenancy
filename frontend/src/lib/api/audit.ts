@@ -203,4 +203,27 @@ export const tenantAuditAPI = {
   getAuditLog: async (logId: string): Promise<AuditLog> => {
     return apiClient.get<AuditLog>(`/admin/audit-logs/${logId}`);
   },
+
+  /**
+   * Archive old audit logs for current tenant
+   * Exports logs to JSON file, then deletes from database
+   */
+  archiveLogs: async (beforeDate?: string): Promise<ArchiveResult> => {
+    const params = beforeDate ? `?before_date=${encodeURIComponent(beforeDate)}` : '';
+    return apiClient.post<ArchiveResult>(`/admin/audit-logs/tenant/archive${params}`);
+  },
+
+  /**
+   * List archived audit log files for current tenant
+   */
+  listArchives: async (): Promise<ArchiveListResponse> => {
+    return apiClient.get<ArchiveListResponse>('/admin/audit-logs/tenant/archives');
+  },
+
+  /**
+   * Get download URL for a tenant archive file
+   */
+  getArchiveDownloadUrl: (filename: string): string => {
+    return `/api/v1/admin/audit-logs/tenant/archives/${encodeURIComponent(filename)}`;
+  },
 };

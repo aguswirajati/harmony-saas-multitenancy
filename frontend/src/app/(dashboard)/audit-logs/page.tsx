@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, Fragment } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { tenantAuditAPI } from '@/lib/api/audit';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { tenantAuditAPI, type ArchiveResult } from '@/lib/api/audit';
 import {
   Table,
   TableBody,
@@ -23,6 +23,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Search,
   ChevronLeft,
   ChevronRight,
@@ -36,11 +44,19 @@ import {
   Activity,
   Users,
   Clock,
+  Archive,
+  Loader2,
+  CalendarDays,
+  Download,
+  FileJson,
+  FolderArchive,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { formatDistanceToNow, format } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { formatDistanceToNow, format, subDays } from 'date-fns';
 
 export default function TenantAuditLogsPage() {
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [search, setSearch] = useState('');
@@ -48,6 +64,37 @@ export default function TenantAuditLogsPage() {
   const [resourceFilter, setResourceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [showArchivesPanel, setShowArchivesPanel] = useState(false);
+  const [archiveDays, setArchiveDays] = useState(90);
+  const [archiveResult, setArchiveResult] = useState<ArchiveResult | null>(null);
+
+  // Fetch archived files
+  const { data: archivesData, refetch: refetchArchives } = useQuery({
+    queryKey: ['tenant-audit-archives'],
+    queryFn: () => tenantAuditAPI.listArchives(),
+    enabled: showArchivesPanel,
+  });
+
+  // Archive logs mutation
+  const archiveLogsMutation = useMutation({
+    mutationFn: (beforeDate: string) => tenantAuditAPI.archiveLogs(beforeDate),
+    onSuccess: (data) => {
+      setShowArchiveDialog(false);
+      setArchiveResult(data);
+      queryClient.invalidateQueries({ queryKey: ['tenant-audit-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-audit-statistics'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-audit-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-audit-resources'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-audit-archives'] });
+    },
+  });
+
+  // Download archive file
+  const handleDownloadArchive = (filename: string) => {
+    const url = tenantAuditAPI.getArchiveDownloadUrl(filename);
+    window.open(url, '_blank');
+  };
 
   const { data: actions = [] } = useQuery({
     queryKey: ['tenant-audit-actions'],
@@ -162,6 +209,28 @@ export default function TenantAuditLogsPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => {
+              setShowArchivesPanel(!showArchivesPanel);
+              if (!showArchivesPanel) refetchArchives();
+            }}
+          >
+            <FolderArchive className="h-4 w-4 mr-2" />
+            View Archives
+            {archivesData?.total ? (
+              <Badge variant="secondary" className="ml-2">{archivesData.total}</Badge>
+            ) : null}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowArchiveDialog(true)}
+          >
+            <Archive className="h-4 w-4 mr-2" />
+            Archive Old Logs
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => refetch()}
             disabled={isFetching}
           >
@@ -174,6 +243,86 @@ export default function TenantAuditLogsPage() {
           </Badge>
         </div>
       </div>
+
+      {/* Archive Result Alert */}
+      {archiveResult && (
+        <Alert className="border-green-500 bg-green-50 dark:bg-green-900/20">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800 dark:text-green-200">
+            <div className="flex flex-col gap-2">
+              <span>{archiveResult.message}</span>
+              {archiveResult.file && (
+                <div className="flex items-center gap-2 mt-1">
+                  <FileJson className="h-4 w-4" />
+                  <span className="font-mono text-sm">{archiveResult.file.name}</span>
+                  <span className="text-xs">({archiveResult.file.size_readable})</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2"
+                    onClick={() => handleDownloadArchive(archiveResult.file!.name)}
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Download
+                  </Button>
+                </div>
+              )}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Archives Panel */}
+      {showArchivesPanel && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FolderArchive className="h-5 w-5" />
+              Archived Audit Logs
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {archivesData?.archives && archivesData.archives.length > 0 ? (
+              <div className="space-y-2">
+                {archivesData.archives.map((archive) => (
+                  <div
+                    key={archive.name}
+                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileJson className="h-8 w-8 text-blue-500" />
+                      <div>
+                        <p className="font-mono text-sm font-medium">{archive.name}</p>
+                        <div className="flex gap-3 text-xs text-muted-foreground">
+                          <span>{archive.total_records.toLocaleString()} records</span>
+                          <span>•</span>
+                          <span>{archive.size_readable}</span>
+                          <span>•</span>
+                          <span>Created {formatDistanceToNow(new Date(archive.created_at), { addSuffix: true })}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadArchive(archive.name)}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Download
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <FolderArchive className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No archived files found</p>
+                <p className="text-sm">Archive old logs to create backup files</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Statistics Cards */}
       {stats && (
@@ -510,6 +659,80 @@ export default function TenantAuditLogsPage() {
           </div>
         )}
       </Card>
+
+      {/* Archive Old Logs Dialog */}
+      <Dialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="h-5 w-5" />
+              Archive Old Audit Logs
+            </DialogTitle>
+            <DialogDescription>
+              Export audit logs to a JSON file, then remove them from the database.
+              Archived files can be downloaded from the &quot;View Archives&quot; panel.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <CalendarDays className="h-5 w-5 text-muted-foreground" />
+              <div className="flex-1">
+                <label className="text-sm font-medium">Delete logs older than</label>
+                <Select
+                  value={archiveDays.toString()}
+                  onValueChange={(v) => setArchiveDays(parseInt(v))}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30 days ago</SelectItem>
+                    <SelectItem value="60">60 days ago</SelectItem>
+                    <SelectItem value="90">90 days ago</SelectItem>
+                    <SelectItem value="180">180 days ago</SelectItem>
+                    <SelectItem value="365">365 days ago</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Cutoff date: {format(subDays(new Date(), archiveDays), 'MMM d, yyyy')}
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowArchiveDialog(false)}
+              disabled={archiveLogsMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const cutoff = subDays(new Date(), archiveDays);
+                archiveLogsMutation.mutate(cutoff.toISOString());
+              }}
+              disabled={archiveLogsMutation.isPending}
+            >
+              {archiveLogsMutation.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Archiving...</>
+              ) : (
+                <><Archive className="mr-2 h-4 w-4" />Archive Logs</>
+              )}
+            </Button>
+          </DialogFooter>
+          {archiveLogsMutation.isError && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {archiveLogsMutation.error instanceof Error
+                  ? archiveLogsMutation.error.message
+                  : 'Failed to archive audit logs'}
+              </AlertDescription>
+            </Alert>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
