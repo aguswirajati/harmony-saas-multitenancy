@@ -25,6 +25,8 @@ import {
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
 import { useState } from 'react';
+import { adminToolsAPI } from '@/lib/api/admin-tools';
+import { toast } from 'sonner';
 
 export default function AdminLayoutClient({
   children,
@@ -32,7 +34,7 @@ export default function AdminLayoutClient({
   children: React.ReactNode
 }) {
   const { user, logout } = useAuthStore();
-  const { devMode, toggleDevMode } = useDevModeStore();
+  const { devMode, setDevMode } = useDevModeStore();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -40,6 +42,21 @@ export default function AdminLayoutClient({
   const handleLogout = async () => {
     await logout();
     router.push('/login');
+  };
+
+  // Toggle dev mode and sync with backend
+  const handleDevModeToggle = async (checked: boolean) => {
+    try {
+      // Update frontend store immediately for responsive UI
+      setDevMode(checked);
+      // Sync with backend to enable server-side dev features
+      await adminToolsAPI.updateSettings({ dev_mode: checked });
+    } catch (error) {
+      // Revert on failure
+      setDevMode(!checked);
+      toast.error('Failed to update dev mode setting');
+      console.error('Dev mode toggle error:', error);
+    }
   };
 
   const baseNavigation = [
@@ -159,7 +176,7 @@ export default function AdminLayoutClient({
               </div>
               <Switch
                 checked={devMode}
-                onCheckedChange={toggleDevMode}
+                onCheckedChange={handleDevModeToggle}
                 className="data-[state=checked]:bg-amber-500"
               />
             </div>
