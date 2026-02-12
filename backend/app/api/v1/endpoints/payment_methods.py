@@ -2,13 +2,14 @@
 Payment Method Endpoints
 Admin endpoints for payment method management
 """
-from fastapi import APIRouter, Depends, Query, Path, Request
+from fastapi import APIRouter, Depends, Query, Path, Request, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 
 from app.core.database import get_db
 from app.api.deps import get_super_admin_user, get_current_active_user
+from app.config import settings
 from app.models.user import User
 from app.services.payment_service import PaymentService
 from app.services.audit_service import AuditService
@@ -208,6 +209,53 @@ def set_qris_image(
     """
     service = PaymentService(db)
     return service.set_qris_image(method_id, file_id)
+
+
+@admin_router.delete("/{method_id}/permanent", status_code=204)
+def permanently_delete_payment_method(
+    request: Request,
+    method_id: UUID = Path(..., description="Payment method ID"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_super_admin_user),
+):
+    """
+    Permanently delete a payment method (hard delete)
+
+    **Super Admin Only - DEV_MODE Only**
+
+    This removes the record from the database completely.
+    Only works on inactive (soft-deleted) records.
+    Use this to free up the unique code for reuse.
+    """
+    if not settings.DEV_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permanent deletion is only allowed in DEV_MODE"
+        )
+
+    service = PaymentService(db)
+    method = service.get_payment_method_by_id(method_id)
+    method_code = method.code
+
+    service.hard_delete_payment_method(method_id)
+
+    # Log audit
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        tenant_id=None,
+        action=AuditAction.PAYMENT_METHOD_DELETED,
+        resource="payment_method",
+        resource_id=method_id,
+        details={
+            "code": method_code,
+            "permanent": True,
+        },
+        status=AuditStatus.SUCCESS,
+        request=request,
+    )
+
+    return None
 
 
 # ============================================================================

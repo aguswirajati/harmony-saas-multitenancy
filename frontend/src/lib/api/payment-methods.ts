@@ -55,6 +55,13 @@ export const paymentMethodsAdminAPI = {
   },
 
   /**
+   * Permanently delete a payment method (hard delete, DEV_MODE only)
+   */
+  async permanentDelete(methodId: string): Promise<void> {
+    return apiClient.delete(`/admin/payment-methods/${methodId}/permanent`);
+  },
+
+  /**
    * Set QRIS image for a payment method
    */
   async setQrisImage(methodId: string, fileId: string): Promise<PaymentMethod> {

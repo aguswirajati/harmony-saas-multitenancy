@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentMethodsAPI } from '@/lib/api/payment-methods';
+import { adminToolsAPI } from '@/lib/api/admin-tools';
 import {
   Table,
   TableBody,
@@ -44,7 +45,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Pencil, Trash2, Building2, QrCode, CreditCard, Wallet } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building2, QrCode, CreditCard, Wallet, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import type {
   PaymentMethod,
@@ -59,8 +60,16 @@ export default function PaymentMethodsPage() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
+
+  // Check if DEV_MODE is enabled
+  const { data: runtimeSettings } = useQuery({
+    queryKey: ['runtime-settings'],
+    queryFn: () => adminToolsAPI.getSettings(),
+  });
+  const isDevMode = runtimeSettings?.dev_mode ?? false;
 
   // Form state
   const [formData, setFormData] = useState<Partial<PaymentMethodCreate>>({
@@ -121,6 +130,19 @@ export default function PaymentMethodsPage() {
     },
   });
 
+  const permanentDeleteMutation = useMutation({
+    mutationFn: (id: string) => paymentMethodsAPI.admin.permanentDelete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-payment-methods'] });
+      toast.success('Payment method permanently deleted');
+      setIsPermanentDeleteDialogOpen(false);
+      setSelectedMethod(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to permanently delete payment method');
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       code: '',
@@ -162,6 +184,11 @@ export default function PaymentMethodsPage() {
   const openDeleteDialog = (method: PaymentMethod) => {
     setSelectedMethod(method);
     setIsDeleteDialogOpen(true);
+  };
+
+  const openPermanentDeleteDialog = (method: PaymentMethod) => {
+    setSelectedMethod(method);
+    setIsPermanentDeleteDialogOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -315,14 +342,27 @@ export default function PaymentMethodsPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDeleteDialog(method)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {method.is_active ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDeleteDialog(method)}
+                            className="text-red-600 hover:text-red-700"
+                            title="Soft delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : isDevMode ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openPermanentDeleteDialog(method)}
+                            className="text-red-600 hover:text-red-700"
+                            title="Permanently delete (DEV_MODE)"
+                          >
+                            <AlertTriangle className="h-4 w-4" />
+                          </Button>
+                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -580,7 +620,7 @@ export default function PaymentMethodsPage() {
             <AlertDialogTitle>Delete Payment Method</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{selectedMethod?.name}&quot;?
-              This action cannot be undone.
+              This will soft-delete the record (mark as inactive).
               <br /><br />
               <strong>Note:</strong> Payment methods with pending upgrade requests cannot be deleted.
             </AlertDialogDescription>
@@ -592,6 +632,36 @@ export default function PaymentMethodsPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Permanent Delete Confirmation Dialog (DEV_MODE only) */}
+      <AlertDialog open={isPermanentDeleteDialogOpen} onOpenChange={setIsPermanentDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Permanently Delete Payment Method
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to <strong>permanently delete</strong> &quot;{selectedMethod?.name}&quot; (code: {selectedMethod?.code})?
+              <br /><br />
+              This will remove the record from the database completely. This action cannot be undone.
+              <br /><br />
+              <span className="text-amber-600 dark:text-amber-400">
+                This is only available in DEV_MODE and allows the code to be reused.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => selectedMethod && permanentDeleteMutation.mutate(selectedMethod.id)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {permanentDeleteMutation.isPending ? 'Deleting...' : 'Permanently Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

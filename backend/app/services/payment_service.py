@@ -162,7 +162,42 @@ class PaymentService:
 
         self.db.commit()
 
-        logger.info(f"Deleted payment method: {method.code}")
+        logger.info(f"Soft deleted payment method: {method.code}")
+        return True
+
+    def hard_delete_payment_method(self, method_id: UUID) -> bool:
+        """
+        Permanently delete a payment method (DEV_MODE only).
+        Only works on inactive (soft-deleted) records.
+        """
+        method = self.db.query(PaymentMethod).filter(
+            PaymentMethod.id == method_id
+        ).first()
+
+        if not method:
+            raise NotFoundException(f"Payment method with ID {method_id} not found")
+
+        if method.is_active:
+            raise BadRequestException(
+                "Cannot permanently delete an active payment method. "
+                "Soft delete it first."
+            )
+
+        # Check if method is referenced by any upgrade requests
+        in_use = self.db.query(func.count(UpgradeRequest.id)).filter(
+            UpgradeRequest.payment_method_id == method_id
+        ).scalar() or 0
+
+        if in_use > 0:
+            raise ConflictException(
+                f"Cannot permanently delete: {in_use} upgrade request(s) reference this method"
+            )
+
+        code = method.code
+        self.db.delete(method)
+        self.db.commit()
+
+        logger.info(f"Permanently deleted payment method: {code}")
         return True
 
     # ========================================================================
