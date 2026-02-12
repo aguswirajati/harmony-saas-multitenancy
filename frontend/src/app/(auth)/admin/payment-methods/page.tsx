@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentMethodsAPI } from '@/lib/api/payment-methods';
-import { adminToolsAPI } from '@/lib/api/admin-tools';
+import { useDevModeStore } from '@/lib/store/devModeStore';
 import {
   Table,
   TableBody,
@@ -58,18 +58,12 @@ import { getPaymentTypeLabel, getWalletTypeLabel } from '@/types/payment';
 
 export default function PaymentMethodsPage() {
   const queryClient = useQueryClient();
+  const { devMode } = useDevModeStore();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
-
-  // Check if DEV_MODE is enabled
-  const { data: runtimeSettings } = useQuery({
-    queryKey: ['runtime-settings'],
-    queryFn: () => adminToolsAPI.getSettings(),
-  });
-  const isDevMode = runtimeSettings?.dev_mode ?? false;
 
   // Form state
   const [formData, setFormData] = useState<Partial<PaymentMethodCreate>>({
@@ -352,7 +346,7 @@ export default function PaymentMethodsPage() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        ) : isDevMode ? (
+                        ) : devMode ? (
                           <Button
                             variant="ghost"
                             size="icon"
