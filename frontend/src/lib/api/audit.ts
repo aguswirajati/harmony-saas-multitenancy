@@ -149,10 +149,10 @@ export const auditAPI = {
   },
 
   /**
-   * Get download URL for an archive file
+   * Download an archive file
    */
-  getArchiveDownloadUrl: (filename: string): string => {
-    return `/api/v1/admin/audit-logs/archives/${encodeURIComponent(filename)}`;
+  downloadArchive: async (filename: string): Promise<void> => {
+    return apiClient.downloadFile(`/admin/audit-logs/archives/${encodeURIComponent(filename)}`, filename);
   },
 
   /**
@@ -221,9 +221,9 @@ export const tenantAuditAPI = {
   },
 
   /**
-   * Get download URL for a tenant archive file
+   * Download an archive file for current tenant
    */
-  getArchiveDownloadUrl: (filename: string): string => {
-    return `/api/v1/admin/audit-logs/tenant/archives/${encodeURIComponent(filename)}`;
+  downloadArchive: async (filename: string): Promise<void> => {
+    return apiClient.downloadFile(`/admin/audit-logs/tenant/archives/${encodeURIComponent(filename)}`, filename);
   },
 };

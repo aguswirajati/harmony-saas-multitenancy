@@ -124,9 +124,13 @@ export default function AuditLogsClient() {
   });
 
   // Download archive file
-  const handleDownloadArchive = (filename: string) => {
-    const url = auditAPI.getArchiveDownloadUrl(filename);
-    window.open(url, '_blank');
+  const handleDownloadArchive = async (filename: string) => {
+    try {
+      await auditAPI.downloadArchive(filename);
+    } catch (error) {
+      toast.error('Failed to download archive file');
+      console.error('Download error:', error);
+    }
   };
 
   // Fetch filter options

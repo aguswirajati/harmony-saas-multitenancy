@@ -54,6 +54,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatDistanceToNow, format, subDays } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function TenantAuditLogsPage() {
   const queryClient = useQueryClient();
@@ -91,9 +92,13 @@ export default function TenantAuditLogsPage() {
   });
 
   // Download archive file
-  const handleDownloadArchive = (filename: string) => {
-    const url = tenantAuditAPI.getArchiveDownloadUrl(filename);
-    window.open(url, '_blank');
+  const handleDownloadArchive = async (filename: string) => {
+    try {
+      await tenantAuditAPI.downloadArchive(filename);
+    } catch (error) {
+      toast.error('Failed to download archive file');
+      console.error('Download error:', error);
+    }
   };
 
   const { data: actions = [] } = useQuery({

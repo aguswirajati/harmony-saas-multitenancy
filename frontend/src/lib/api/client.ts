@@ -176,6 +176,27 @@ class APIClient {
     const response = await this.client.delete<T>(url, config);
     return response.data;
   }
+
+  /**
+   * Download a file with authentication headers
+   * Fetches the file as blob and triggers browser download
+   */
+  async downloadFile(url: string, filename: string): Promise<void> {
+    const response = await this.client.get(url, {
+      responseType: 'blob',
+    });
+
+    // Create blob URL and trigger download
+    const blob = new Blob([response.data]);
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
 }
 
 export const apiClient = new APIClient();
