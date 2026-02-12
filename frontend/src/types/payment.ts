@@ -85,7 +85,9 @@ export interface PublicTier {
 // PAYMENT METHODS
 // ============================================================================
 
-export type PaymentMethodType = 'bank_transfer' | 'qris';
+export type PaymentMethodType = 'bank_transfer' | 'qris' | 'wallet';
+
+export type WalletProvider = 'shopeepay' | 'gopay' | 'dana' | 'ovo' | 'linkaja' | 'other';
 
 export interface PaymentMethod {
   id: string;
@@ -95,6 +97,7 @@ export interface PaymentMethod {
   bank_name: string | null;
   account_number: string | null;
   account_name: string | null;
+  wallet_type: WalletProvider | null;
   qris_image_file_id: string | null;
   qris_image_url: string | null;
   instructions: string | null;
@@ -112,6 +115,7 @@ export interface PaymentMethodCreate {
   bank_name?: string;
   account_number?: string;
   account_name?: string;
+  wallet_type?: WalletProvider;
   instructions?: string;
   sort_order?: number;
   is_public?: boolean;
@@ -122,6 +126,7 @@ export interface PaymentMethodUpdate {
   bank_name?: string;
   account_number?: string;
   account_name?: string;
+  wallet_type?: WalletProvider;
   instructions?: string;
   sort_order?: number;
   is_public?: boolean;
@@ -136,6 +141,7 @@ export interface PublicPaymentMethod {
   bank_name: string | null;
   account_number: string | null;
   account_name: string | null;
+  wallet_type: WalletProvider | null;
   qris_image_url: string | null;
   instructions: string | null;
 }
@@ -331,7 +337,29 @@ export function getPaymentTypeLabel(type: PaymentMethodType): string {
       return 'Bank Transfer';
     case 'qris':
       return 'QRIS';
+    case 'wallet':
+      return 'E-Wallet';
     default:
       return type;
+  }
+}
+
+export function getWalletTypeLabel(walletType: WalletProvider | null): string {
+  if (!walletType) return '';
+  switch (walletType) {
+    case 'shopeepay':
+      return 'ShopeePay';
+    case 'gopay':
+      return 'GoPay';
+    case 'dana':
+      return 'DANA';
+    case 'ovo':
+      return 'OVO';
+    case 'linkaja':
+      return 'LinkAja';
+    case 'other':
+      return 'Other';
+    default:
+      return walletType;
   }
 }

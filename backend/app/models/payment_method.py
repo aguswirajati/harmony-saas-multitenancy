@@ -13,6 +13,7 @@ class PaymentMethodType:
     """Payment method type constants"""
     BANK_TRANSFER = "bank_transfer"
     QRIS = "qris"
+    WALLET = "wallet"  # E-wallets: ShopeePay, GoPay, Dana, OVO, etc.
 
 
 class PaymentMethod(Base, BaseModel):
@@ -46,7 +47,7 @@ class PaymentMethod(Base, BaseModel):
         String(50),
         nullable=False,
         index=True,
-        comment="Payment type: bank_transfer, qris"
+        comment="Payment type: bank_transfer, qris, wallet"
     )
 
     # Bank transfer details
@@ -58,12 +59,19 @@ class PaymentMethod(Base, BaseModel):
     account_number = Column(
         String(50),
         nullable=True,
-        comment="Bank account number"
+        comment="Bank account number or wallet phone number"
     )
     account_name = Column(
         String(100),
         nullable=True,
-        comment="Bank account holder name"
+        comment="Bank account holder name or wallet account name"
+    )
+
+    # Wallet details (e.g., ShopeePay, GoPay, Dana)
+    wallet_type = Column(
+        String(50),
+        nullable=True,
+        comment="Wallet provider: shopeepay, gopay, dana, ovo, linkaja"
     )
 
     # QRIS image (stored in Files table)
@@ -110,3 +118,8 @@ class PaymentMethod(Base, BaseModel):
     def is_qris(self) -> bool:
         """Check if this is a QRIS method"""
         return self.type == PaymentMethodType.QRIS
+
+    @property
+    def is_wallet(self) -> bool:
+        """Check if this is an e-wallet method"""
+        return self.type == PaymentMethodType.WALLET

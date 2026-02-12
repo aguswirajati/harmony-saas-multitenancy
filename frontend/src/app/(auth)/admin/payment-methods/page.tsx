@@ -44,15 +44,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Pencil, Trash2, Building2, QrCode, CreditCard } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building2, QrCode, CreditCard, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import type {
   PaymentMethod,
   PaymentMethodCreate,
   PaymentMethodUpdate,
   PaymentMethodType,
+  WalletProvider,
 } from '@/types/payment';
-import { getPaymentTypeLabel } from '@/types/payment';
+import { getPaymentTypeLabel, getWalletTypeLabel } from '@/types/payment';
 
 export default function PaymentMethodsPage() {
   const queryClient = useQueryClient();
@@ -69,6 +70,7 @@ export default function PaymentMethodsPage() {
     bank_name: '',
     account_number: '',
     account_name: '',
+    wallet_type: undefined,
     instructions: '',
     sort_order: 0,
     is_public: true,
@@ -127,6 +129,7 @@ export default function PaymentMethodsPage() {
       bank_name: '',
       account_number: '',
       account_name: '',
+      wallet_type: undefined,
       instructions: '',
       sort_order: 0,
       is_public: true,
@@ -148,6 +151,7 @@ export default function PaymentMethodsPage() {
       bank_name: method.bank_name || '',
       account_number: method.account_number || '',
       account_name: method.account_name || '',
+      wallet_type: method.wallet_type || undefined,
       instructions: method.instructions || '',
       sort_order: method.sort_order,
       is_public: method.is_public,
@@ -179,6 +183,8 @@ export default function PaymentMethodsPage() {
         return <Building2 className="h-4 w-4" />;
       case 'qris':
         return <QrCode className="h-4 w-4" />;
+      case 'wallet':
+        return <Wallet className="h-4 w-4" />;
       default:
         return <CreditCard className="h-4 w-4" />;
     }
@@ -267,6 +273,13 @@ export default function PaymentMethodsPage() {
                       {method.type === 'bank_transfer' ? (
                         <div className="text-sm">
                           <p className="font-medium">{method.bank_name}</p>
+                          <p className="text-muted-foreground">
+                            {method.account_number} - {method.account_name}
+                          </p>
+                        </div>
+                      ) : method.type === 'wallet' ? (
+                        <div className="text-sm">
+                          <p className="font-medium">{getWalletTypeLabel(method.wallet_type)}</p>
                           <p className="text-muted-foreground">
                             {method.account_number} - {method.account_name}
                           </p>
@@ -363,6 +376,7 @@ export default function PaymentMethodsPage() {
                     <SelectContent>
                       <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                       <SelectItem value="qris">QRIS</SelectItem>
+                      <SelectItem value="wallet">E-Wallet</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -436,6 +450,57 @@ export default function PaymentMethodsPage() {
                         setFormData({ ...formData, account_name: e.target.value })
                       }
                       placeholder="e.g., PT Company Name"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Wallet Fields */}
+            {formData.type === 'wallet' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="wallet_type">Wallet Provider</Label>
+                  <Select
+                    value={formData.wallet_type || ''}
+                    onValueChange={(value: WalletProvider) =>
+                      setFormData({ ...formData, wallet_type: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select wallet provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="shopeepay">ShopeePay</SelectItem>
+                      <SelectItem value="gopay">GoPay</SelectItem>
+                      <SelectItem value="dana">DANA</SelectItem>
+                      <SelectItem value="ovo">OVO</SelectItem>
+                      <SelectItem value="linkaja">LinkAja</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="account_number">Phone Number</Label>
+                    <Input
+                      id="account_number"
+                      value={formData.account_number || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, account_number: e.target.value })
+                      }
+                      placeholder="e.g., 08123456789"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="account_name">Account Name</Label>
+                    <Input
+                      id="account_name"
+                      value={formData.account_name || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, account_name: e.target.value })
+                      }
+                      placeholder="e.g., John Doe"
                     />
                   </div>
                 </div>

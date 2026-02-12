@@ -27,7 +27,7 @@ class PaymentMethodCreate(BaseModel):
         max_length=100,
         description="Display name"
     )
-    type: Literal["bank_transfer", "qris"] = Field(
+    type: Literal["bank_transfer", "qris", "wallet"] = Field(
         ...,
         description="Payment type"
     )
@@ -36,6 +36,13 @@ class PaymentMethodCreate(BaseModel):
     bank_name: Optional[str] = Field(None, max_length=100)
     account_number: Optional[str] = Field(None, max_length=50)
     account_name: Optional[str] = Field(None, max_length=100)
+
+    # Wallet details (for e-wallets like ShopeePay, GoPay, Dana)
+    wallet_type: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Wallet provider: shopeepay, gopay, dana, ovo, linkaja"
+    )
 
     # Instructions
     instructions: Optional[str] = Field(None, max_length=2000)
@@ -56,6 +63,7 @@ class PaymentMethodUpdate(BaseModel):
     bank_name: Optional[str] = Field(None, max_length=100)
     account_number: Optional[str] = Field(None, max_length=50)
     account_name: Optional[str] = Field(None, max_length=100)
+    wallet_type: Optional[str] = Field(None, max_length=50)
     instructions: Optional[str] = Field(None, max_length=2000)
     sort_order: Optional[int] = Field(None, ge=0)
     is_public: Optional[bool] = None
@@ -71,6 +79,7 @@ class PaymentMethodResponse(BaseModel):
     bank_name: Optional[str]
     account_number: Optional[str]
     account_name: Optional[str]
+    wallet_type: Optional[str]
     qris_image_file_id: Optional[UUID]
     qris_image_url: Optional[str] = None
     instructions: Optional[str]
@@ -113,6 +122,7 @@ class PublicPaymentMethodResponse(BaseModel):
     bank_name: Optional[str]
     account_number: Optional[str]
     account_name: Optional[str]
+    wallet_type: Optional[str]
     qris_image_url: Optional[str]
     instructions: Optional[str]
 
