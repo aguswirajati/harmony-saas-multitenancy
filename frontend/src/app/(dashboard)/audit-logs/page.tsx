@@ -66,7 +66,7 @@ export default function TenantAuditLogsPage() {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [showArchivesPanel, setShowArchivesPanel] = useState(false);
-  const [archiveDays, setArchiveDays] = useState(90);
+  const [archiveDays, setArchiveDays] = useState(0); // Default to "All logs"
   const [archiveResult, setArchiveResult] = useState<ArchiveResult | null>(null);
 
   // Fetch archived files
@@ -686,15 +686,19 @@ export default function TenantAuditLogsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="0">All logs (archive everything)</SelectItem>
+                    <SelectItem value="1">1 day ago</SelectItem>
+                    <SelectItem value="7">7 days ago</SelectItem>
+                    <SelectItem value="14">14 days ago</SelectItem>
                     <SelectItem value="30">30 days ago</SelectItem>
                     <SelectItem value="60">60 days ago</SelectItem>
                     <SelectItem value="90">90 days ago</SelectItem>
-                    <SelectItem value="180">180 days ago</SelectItem>
-                    <SelectItem value="365">365 days ago</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Cutoff date: {format(subDays(new Date(), archiveDays), 'MMM d, yyyy')}
+                  {archiveDays === 0
+                    ? 'Will archive ALL audit logs'
+                    : `Will archive logs older than ${format(subDays(new Date(), archiveDays), 'MMM d, yyyy')}`}
                 </p>
               </div>
             </div>
@@ -709,7 +713,10 @@ export default function TenantAuditLogsPage() {
             </Button>
             <Button
               onClick={() => {
-                const cutoff = subDays(new Date(), archiveDays);
+                // If archiveDays is 0, use tomorrow's date to archive all logs
+                const cutoff = archiveDays === 0
+                  ? new Date(Date.now() + 24 * 60 * 60 * 1000) // tomorrow
+                  : subDays(new Date(), archiveDays);
                 archiveLogsMutation.mutate(cutoff.toISOString());
               }}
               disabled={archiveLogsMutation.isPending}
