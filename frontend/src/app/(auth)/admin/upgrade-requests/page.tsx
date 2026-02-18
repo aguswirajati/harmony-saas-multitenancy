@@ -57,7 +57,11 @@ import {
   getStatusLabel,
 } from '@/types/payment';
 
-export default function UpgradeRequestsPage() {
+interface UpgradeRequestsPageProps {
+  embedded?: boolean;
+}
+
+export default function UpgradeRequestsPage({ embedded = false }: UpgradeRequestsPageProps) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
@@ -155,18 +159,20 @@ export default function UpgradeRequestsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className={embedded ? "space-y-4" : "space-y-6 p-6"}>
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Upgrade Requests
-          </h1>
-          <p className="text-muted-foreground">
-            Review and approve subscription upgrades
-          </p>
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Upgrade Requests
+            </h1>
+            <p className="text-muted-foreground">
+              Review and approve subscription upgrades
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Stats Cards */}
       {stats && (

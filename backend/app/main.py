@@ -4,6 +4,7 @@ from app.config import settings
 from app.api.v1 import router as api_v1_router
 from app.middleware.error_handler import register_exception_handlers
 from app.middleware.logging import RequestLoggingMiddleware
+from app.middleware.usage_tracking import UsageTrackingMiddleware
 from loguru import logger
 
 # Sentry error tracking (no-op if SENTRY_DSN not configured)
@@ -72,6 +73,9 @@ app.add_middleware(
 
 # Request Logging Middleware
 app.add_middleware(RequestLoggingMiddleware)
+
+# Usage Tracking Middleware (tracks API calls per tenant)
+app.add_middleware(UsageTrackingMiddleware)
 
 # Register exception handlers
 register_exception_handlers(app)

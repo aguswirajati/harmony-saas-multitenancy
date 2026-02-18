@@ -107,13 +107,24 @@ def preview_upgrade(
     tenant: Tenant = Depends(get_current_tenant),
 ):
     """
-    Preview upgrade details before creating request
+    Preview upgrade/downgrade details before creating request
 
     **Tenant Admin Only**
+
+    Returns proration details including:
+    - days_remaining: Days left in current billing period
+    - proration_credit: Credit from unused days of current tier
+    - proration_charge: Charge for remaining days at new tier
+    - credit_balance_available: Available credit balance
+    - amount_due: Final amount to pay (0 for downgrades)
+    - effective_date: When the change takes effect
+    - requires_payment: Whether payment is required
     """
     if current_user.role == "super_admin":
         from app.core.exceptions import ForbiddenException
         raise ForbiddenException("Super admin should use admin endpoints")
+
+    from app.services.proration_service import ProrationService
 
     tier_service = SubscriptionTierService(db)
 
@@ -124,12 +135,42 @@ def preview_upgrade(
         from app.core.exceptions import NotFoundException
         raise NotFoundException(f"Tier '{target_tier_code}' not found")
 
+    # Calculate prices for the billing period
     if billing_period == "yearly":
-        amount = target_tier.price_yearly
+        current_price = current_tier.price_yearly if current_tier else 0
+        target_price = target_tier.price_yearly
         savings = (target_tier.price_monthly * 12) - target_tier.price_yearly
     else:
-        amount = target_tier.price_monthly
+        current_price = current_tier.price_monthly if current_tier else 0
+        target_price = target_tier.price_monthly
         savings = None
+
+    # Determine if this is an upgrade or downgrade
+    is_upgrade = ProrationService.is_upgrade(current_price, target_price)
+
+    if is_upgrade:
+        # Calculate proration for upgrade
+        proration = ProrationService.calculate_upgrade_proration(
+            current_tier_price=current_price,
+            new_tier_price=target_price,
+            billing_period=billing_period,
+            subscription_ends_at=tenant.subscription_ends_at,
+            credit_balance=tenant.credit_balance or 0,
+        )
+        effective_date = None  # Immediate
+        requires_payment = proration.amount_due > 0
+        request_type = "upgrade"
+    else:
+        # Calculate proration for downgrade (no payment required)
+        proration = ProrationService.calculate_downgrade_proration(
+            current_tier_price=current_price,
+            new_tier_price=target_price,
+            billing_period=billing_period,
+            subscription_ends_at=tenant.subscription_ends_at,
+        )
+        effective_date = tenant.subscription_ends_at
+        requires_payment = False
+        request_type = "downgrade"
 
     return UpgradePreview(
         current_tier_code=tenant.tier,
@@ -137,7 +178,7 @@ def preview_upgrade(
         target_tier_code=target_tier_code,
         target_tier_name=target_tier.display_name,
         billing_period=billing_period,
-        amount=amount,
+        amount=proration.amount_due,
         currency=target_tier.currency,
         savings_from_yearly=savings,
         new_limits={
@@ -145,6 +186,17 @@ def preview_upgrade(
             "max_branches": target_tier.max_branches,
             "max_storage_gb": target_tier.max_storage_gb,
         },
+        # Proration fields
+        request_type=request_type,
+        days_remaining=proration.days_remaining,
+        proration_credit=proration.proration_credit,
+        proration_charge=proration.proration_charge,
+        credit_balance_available=proration.credit_balance_available,
+        credit_to_apply=proration.credit_to_apply,
+        amount_due=proration.amount_due,
+        original_amount=proration.original_amount,
+        effective_date=effective_date,
+        requires_payment=requires_payment,
     )
 
 
@@ -278,24 +330,29 @@ def get_invoice_data(
 
     **Tenant Admin Only**
 
-    Returns data needed to generate/display an invoice.
+    Returns data needed to generate/display an invoice with proration breakdown.
     """
     if current_user.role == "super_admin":
         from app.core.exceptions import ForbiddenException
         raise ForbiddenException("Super admin should use admin endpoints")
 
-    from app.schemas.payment import InvoiceData
+    from app.schemas.payment import InvoiceData, InvoiceLineItem
 
     service = PaymentService(db)
+    tier_service = SubscriptionTierService(db)
     upgrade_request = service.get_upgrade_request_by_id(request_id, tenant.id)
+
+    # Get tier names
+    target_tier = tier_service.get_tier_by_code(upgrade_request.target_tier_code)
+    current_tier = tier_service.get_tier_by_code(upgrade_request.current_tier_code)
+
+    target_tier_name = target_tier.display_name if target_tier else upgrade_request.target_tier_code
+    current_tier_name = current_tier.display_name if current_tier else upgrade_request.current_tier_code
 
     # Get payment method name
     payment_method_name = None
     if upgrade_request.payment_method:
         payment_method_name = upgrade_request.payment_method.name
-
-    # Build description
-    description = f"Subscription upgrade: {upgrade_request.current_tier_code} → {upgrade_request.target_tier_code}"
 
     # Determine status
     if upgrade_request.status == "approved":
@@ -305,6 +362,69 @@ def get_invoice_data(
     else:
         invoice_status = "pending"
 
+    # Build line items based on proration
+    line_items = []
+
+    is_upgrade = upgrade_request.request_type == "upgrade"
+    days = upgrade_request.days_remaining
+
+    if is_upgrade and days > 0:
+        # Proration line items for upgrades
+        if upgrade_request.proration_charge > 0:
+            line_items.append(InvoiceLineItem(
+                description=f"{target_tier_name} Plan ({days} days)",
+                quantity=1,
+                unit_price=upgrade_request.proration_charge,
+                amount=upgrade_request.proration_charge,
+                is_credit=False,
+            ))
+
+        if upgrade_request.proration_credit > 0:
+            line_items.append(InvoiceLineItem(
+                description=f"Credit: {current_tier_name} Plan unused ({days} days)",
+                quantity=1,
+                unit_price=-upgrade_request.proration_credit,
+                amount=-upgrade_request.proration_credit,
+                is_credit=True,
+            ))
+    else:
+        # Full price line item (no proration)
+        line_items.append(InvoiceLineItem(
+            description=f"{target_tier_name} Plan ({upgrade_request.billing_period})",
+            quantity=1,
+            unit_price=upgrade_request.original_amount or upgrade_request.amount,
+            amount=upgrade_request.original_amount or upgrade_request.amount,
+            is_credit=False,
+        ))
+
+    # Calculate subtotal (before credits)
+    subtotal = upgrade_request.proration_charge if upgrade_request.proration_charge > 0 else upgrade_request.amount
+
+    # Credit applied from balance
+    credit_applied = 0
+    if upgrade_request.transaction and upgrade_request.transaction.credit_applied > 0:
+        credit_applied = upgrade_request.transaction.credit_applied
+        line_items.append(InvoiceLineItem(
+            description="Credit Balance Applied",
+            quantity=1,
+            unit_price=-credit_applied,
+            amount=-credit_applied,
+            is_credit=True,
+        ))
+
+    # Build description
+    if is_upgrade:
+        description = f"Subscription upgrade: {current_tier_name} → {target_tier_name}"
+    else:
+        description = f"Subscription downgrade: {current_tier_name} → {target_tier_name}"
+
+    # Get period dates from transaction if available
+    period_start = None
+    period_end = None
+    if upgrade_request.transaction:
+        period_start = upgrade_request.transaction.period_start
+        period_end = upgrade_request.transaction.period_end
+
     return InvoiceData(
         transaction_number=upgrade_request.transaction.transaction_number if upgrade_request.transaction else upgrade_request.request_number,
         invoice_date=upgrade_request.created_at,
@@ -313,10 +433,16 @@ def get_invoice_data(
         seller_name="Harmony SaaS",
         buyer_name=tenant.name,
         buyer_email=None,
+        line_items=line_items,
+        subtotal=subtotal,
+        credit_applied=credit_applied + upgrade_request.proration_credit,
+        total=upgrade_request.amount,
         description=description,
         billing_period=upgrade_request.billing_period,
         amount=upgrade_request.amount,
         currency=upgrade_request.currency,
+        period_start=period_start,
+        period_end=period_end,
         payment_method_name=payment_method_name,
     )
 
@@ -367,6 +493,7 @@ def list_all_upgrade_requests(
                 request_number=req.request_number,
                 tenant_id=req.tenant_id,
                 tenant_name=tenant.name if tenant else None,
+                request_type=req.request_type or "upgrade",
                 current_tier_code=req.current_tier_code,
                 target_tier_code=req.target_tier_code,
                 billing_period=req.billing_period,
@@ -375,6 +502,7 @@ def list_all_upgrade_requests(
                 status=req.status,
                 has_payment_proof=req.payment_proof_file_id is not None,
                 expires_at=req.expires_at,
+                effective_date=req.effective_date,
                 created_at=req.created_at,
             )
         )
@@ -494,6 +622,7 @@ def _build_upgrade_response(db: Session, req) -> UpgradeRequestResponse:
         id=req.id,
         request_number=req.request_number,
         tenant_id=req.tenant_id,
+        request_type=req.request_type or "upgrade",
         current_tier_code=req.current_tier_code,
         target_tier_code=req.target_tier_code,
         current_tier_name=current_tier.display_name if current_tier else req.current_tier_code,
@@ -501,6 +630,13 @@ def _build_upgrade_response(db: Session, req) -> UpgradeRequestResponse:
         billing_period=req.billing_period,
         amount=req.amount,
         currency=req.currency,
+        # Proration fields
+        original_amount=req.original_amount or 0,
+        proration_credit=req.proration_credit or 0,
+        proration_charge=req.proration_charge or 0,
+        days_remaining=req.days_remaining or 0,
+        effective_date=req.effective_date,
+        # Payment fields
         payment_method_id=req.payment_method_id,
         payment_method_name=payment_method_name,
         payment_proof_file_id=req.payment_proof_file_id,

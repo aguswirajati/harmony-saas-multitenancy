@@ -56,7 +56,11 @@ import type {
 } from '@/types/payment';
 import { getPaymentTypeLabel, getWalletTypeLabel } from '@/types/payment';
 
-export default function PaymentMethodsPage() {
+interface PaymentMethodsPageProps {
+  embedded?: boolean;
+}
+
+export default function PaymentMethodsPage({ embedded = false }: PaymentMethodsPageProps) {
   const queryClient = useQueryClient();
   const { devMode } = useDevModeStore();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -212,25 +216,27 @@ export default function PaymentMethodsPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className={embedded ? "space-y-4" : "space-y-6 p-6"}>
       {/* Page Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Payment Methods
-          </h1>
-          <p className="text-muted-foreground">
-            Manage bank accounts and QRIS for manual payments
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
+        {!embedded && (
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Payment Methods
+            </h1>
+            <p className="text-muted-foreground">
+              Manage bank accounts and QRIS for manual payments
+            </p>
+          </div>
+        )}
+        <div className={`flex items-center gap-4 ${embedded ? 'w-full justify-between' : ''}`}>
           <div className="flex items-center gap-2">
             <Switch
-              id="include-inactive"
+              id="include-inactive-pm"
               checked={includeInactive}
               onCheckedChange={setIncludeInactive}
             />
-            <Label htmlFor="include-inactive" className="text-sm">
+            <Label htmlFor="include-inactive-pm" className="text-sm">
               Show inactive
             </Label>
           </div>

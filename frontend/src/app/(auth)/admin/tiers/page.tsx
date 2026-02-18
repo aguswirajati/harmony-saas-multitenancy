@@ -46,7 +46,11 @@ import type {
 } from '@/types/payment';
 import { formatCurrency, formatLimit } from '@/types/payment';
 
-export default function TiersPage() {
+interface TiersPageProps {
+  embedded?: boolean;
+}
+
+export default function TiersPage({ embedded = false }: TiersPageProps) {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -185,18 +189,20 @@ export default function TiersPage() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className={embedded ? "space-y-4" : "space-y-6 p-6"}>
       {/* Page Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Subscription Tiers
-          </h1>
-          <p className="text-muted-foreground">
-            Manage pricing tiers and limits
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
+        {!embedded && (
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Subscription Tiers
+            </h1>
+            <p className="text-muted-foreground">
+              Manage pricing tiers and limits
+            </p>
+          </div>
+        )}
+        <div className={`flex items-center gap-4 ${embedded ? 'w-full justify-between' : ''}`}>
           <div className="flex items-center gap-2">
             <Switch
               id="include-inactive"

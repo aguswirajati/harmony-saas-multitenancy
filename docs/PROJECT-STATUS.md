@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-02-12 (Session 15)
+> Last updated: 2026-02-18 (Session 17)
 
 ---
 
@@ -34,14 +34,18 @@
 | Format settings | Done | Tenant-level currency, number, date formatting with live preview in settings |
 | Subscription tiers (DB-driven) | Done | Database-driven tier config, admin UI for CRUD, replaces hardcoded tiers |
 | Manual payment system | Done | Bank transfer + QRIS, upgrade requests with proof upload, admin review/approval |
+| Revenue analytics | Done | MRR/ARR/churn/ARPU metrics, time-series charts, revenue breakdowns, CSV export |
+| Usage metering | Done | API call tracking, quota management, usage alerts, admin usage overview |
+| Coupon system | Done | Percentage/fixed/trial discounts, redemption tracking, admin CRUD, upgrade integration |
+| Transaction Command Center | Done | Unified billing management, approve/reject, coupon/discount/bonus application, proration with bonus days |
 
-**Overall**: Phase 1 (Critical Foundation) is **100% complete**. Phase 2 (Subscription System) now complete.
+**Overall**: Phase 1 (Critical Foundation) is **100% complete**. Phase 2 (Billing & Subscription System) is **100% complete**.
 
 ---
 
 ## 2. What's Implemented
 
-### Backend: 72 API Endpoints across 14 Routers
+### Backend: 155+ API Endpoints across 20 Routers
 
 | Router | Prefix | Endpoints | Auth Required |
 |--------|--------|-----------|---------------|
@@ -60,10 +64,15 @@
 | payment-methods (public) | `/api/v1/payment-methods` | 1 (list available methods) | Authenticated |
 | upgrade-requests (tenant) | `/api/v1/upgrade-requests` | 7 (create, list, get, update, upload proof, cancel, preview, invoice) | Tenant Admin |
 | upgrade-requests (admin) | `/api/v1/admin/upgrade-requests` | 5 (list all, get, review, stats, pending count) | Super Admin |
+| admin-billing | `/api/v1/admin/billing` | 12 (list, detail, stats, approve, reject, apply-coupon, apply-discount, add-bonus, add-note, create manual, requires-review) | Super Admin |
+| admin-revenue | `/api/v1/admin/revenue` | 3 (stats, trends, CSV export) | Super Admin |
+| usage (tenant) | `/api/v1/usage` | 8 (summary, quotas, trends, alerts, dismiss alert) | Tenant Admin |
+| usage (admin) | `/api/v1/admin/usage` | 8 (overview, tenant list, tenant detail, set quota, reset quota) | Super Admin |
+| coupons | `/api/v1/coupons` + `/api/v1/admin/coupons` | 15 (CRUD, validate, apply, redemptions, stats) | Varies |
 | files | `/api/v1/files` | 12 (presign upload, confirm, list, get, download, update, delete, storage usage, tenant logo CRUD, user avatar CRUD) | Varies |
 | files (admin) | `/api/v1/files/admin` | 1 (admin download - view any file) | Super Admin |
 
-### Backend: Models (9 concrete + 2 abstract bases)
+### Backend: Models (14 concrete + 2 abstract bases)
 
 | Model | Table | Key Fields |
 |-------|-------|------------|
@@ -74,12 +83,17 @@
 | File | `files` | filename, storage_key, content_type, size_bytes, category, tenant_id |
 | SubscriptionTier | `subscription_tiers` | code, display_name, price_monthly, price_yearly, max_users, max_branches, max_storage_gb, features (JSON) |
 | PaymentMethod | `payment_methods` | code, name, type (bank_transfer/qris/wallet), bank_name, account_number, qris_image_file_id, wallet_type |
-| UpgradeRequest | `upgrade_requests` | request_number, tenant_id, current/target_tier_code, amount, status, payment_proof_file_id |
-| BillingTransaction | `billing_transactions` | transaction_number, upgrade_request_id, amount, currency, billing_period, status, invoice_date, paid_at |
+| UpgradeRequest | `upgrade_requests` | request_number, tenant_id, current/target_tier_code, amount, status, payment_proof_file_id, coupon_code, discount_amount |
+| BillingTransaction | `billing_transactions` | transaction_number, upgrade_request_id, amount, original_amount, credit_applied, discount_amount, bonus_days, net_amount, proration_details (JSON), period_start, period_end, coupon_id, admin_notes, adjusted_by_id, rejected_by_id, rejection_reason, status |
+| UsageRecord | `usage_records` | tenant_id, metric_type, value, recorded_at |
+| UsageQuota | `usage_quotas` | tenant_id, metric_type, quota_limit, current_usage, alert_threshold |
+| UsageAlert | `usage_alerts` | tenant_id, metric_type, threshold_percent, message, is_dismissed |
+| Coupon | `coupons` | code, name, discount_type, discount_value, max_redemptions, valid_until, valid_for_tiers |
+| CouponRedemption | `coupon_redemptions` | coupon_id, tenant_id, upgrade_request_id, discount_applied, expires_at |
 | BaseModel | (abstract) | id (UUID), created_at, updated_at, deleted_at, is_active, created_by_id, updated_by_id, deleted_by_id |
 | TenantScopedModel | (abstract) | Inherits BaseModel + tenant_id (CASCADE), branch_id (SET NULL) |
 
-### Backend: Services (8)
+### Backend: Services (12)
 
 | Service | Purpose |
 |---------|---------|
@@ -91,14 +105,19 @@
 | EmailService | SMTP sending, Jinja2 template rendering (welcome, reset, verify, invite) |
 | SubscriptionTierService | Tier CRUD, get public/all tiers, tier limits lookup, default tier seeding |
 | PaymentService | Payment method CRUD, upgrade request lifecycle (create → proof → review → apply) |
+| RevenueService | MRR/ARR/churn/ARPU calculations, revenue trends, breakdowns, CSV export |
+| UsageService | Usage tracking, quota management, alerts, trends aggregation |
+| ProrationService | Proration calculations for mid-cycle upgrades/downgrades |
+| CouponService | Coupon validation, redemption, statistics, discount application |
 
-### Backend: Middleware (3)
+### Backend: Middleware (4)
 
 | Middleware | File | Purpose |
 |------------|------|---------|
 | Rate Limiter | `middleware/rate_limiter.py` | Redis sliding window, configurable per-endpoint |
 | Error Handler | `middleware/error_handler.py` | Global exception handling, standardized responses |
 | Request Logger | `middleware/logging.py` | Request ID, processing time, structured logging |
+| Usage Tracking | `middleware/usage_tracking.py` | API call metering per tenant, excludes auth/public paths |
 
 ### Backend: Validators
 
@@ -111,7 +130,7 @@
 | SQLInjectionValidator | Detects SQL keywords, comments, injection patterns |
 | XSSValidator | Detects script tags, javascript: protocol, event handlers |
 
-### Frontend: 26 Pages
+### Frontend: 31 Pages
 
 **Public (6 pages)**:
 | Route | Purpose |
@@ -123,7 +142,7 @@
 | `/verify-email` | Verify email with token |
 | `/accept-invite` | Accept user invitation and set password |
 
-**Dashboard - Tenant Users (6 pages)**:
+**Dashboard - Tenant Users (7 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/dashboard` | Stats, usage cards, quick actions |
@@ -132,8 +151,9 @@
 | `/settings` | Organization tab + Subscription/usage tab + Format settings tab |
 | `/audit-logs` | Tenant-scoped audit log viewer (admin only) |
 | `/upgrade` | Upgrade wizard + active request management (proof preview, invoice dialog, print/PDF) |
+| `/usage` | Usage dashboard with quotas, trends, alerts |
 
-**Admin - Super Admin (14 pages)**:
+**Admin - Super Admin (18 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/admin` | Dashboard with system stats |
@@ -150,6 +170,11 @@
 | `/admin/tiers` | Subscription tier CRUD (pricing, limits, features) |
 | `/admin/payment-methods` | Payment method CRUD (bank transfer, QRIS) |
 | `/admin/upgrade-requests` | Review and approve/reject upgrade requests |
+| `/admin/billing` | Billing transactions list, dashboard stats |
+| `/admin/billing/[transactionId]` | Transaction detail with approve/reject/coupon/discount/bonus/notes actions, payment proof preview, invoice dialog |
+| `/admin/revenue` | Revenue analytics (MRR, ARR, churn, trends, CSV export) |
+| `/admin/usage` | System-wide usage overview, per-tenant quotas |
+| `/admin/coupons` | Coupon management (CRUD, statistics, redemptions) |
 
 ### Frontend: Key Components
 
@@ -177,6 +202,10 @@
 | `d8f3a2b5c6e7` | Add file storage (files table, tenant storage tracking) |
 | `e9f4a3b6c7d8` | Add subscription system (subscription_tiers, payment_methods, upgrade_requests) |
 | `g2h4i5j6k7l8` | Add billing transactions table (invoices/receipts for upgrade requests) |
+| `h3i5j6k7l8m9` | Add proration billing fields to upgrade_requests |
+| `i4j6k7l8m9n0` | Add usage metering (usage_records, usage_quotas, usage_alerts) |
+| `j5k7l8m9n0o1` | Add coupon system (coupons, coupon_redemptions, upgrade_requests coupon fields) |
+| `k6l8m9n0o1p2` | Transaction command center (billing_transaction enhancements: discount, bonus, proration, admin actions) |
 
 ---
 
@@ -279,14 +308,16 @@ Before this project can be considered a production-ready boilerplate:
 - Language switcher component
 - Backend error messages with i18n keys
 
-**Subscription & Billing** (Partial - Manual Payment Done)
+**Subscription & Billing** (Done)
 - ~~Database-driven subscription tiers~~ Done (admin CRUD, replaces hardcoded config)
 - ~~Manual payment system (Indonesia market)~~ Done (bank transfer + QRIS, proof upload, admin review)
 - ~~Self-service tier upgrade flow~~ Done (4-step wizard: tier → billing → payment → confirm)
 - ~~Upgrade request tracking~~ Done (status workflow: pending → payment_uploaded → approved/rejected)
+- ~~Revenue analytics dashboard~~ Done (MRR, ARR, churn rate, ARPU, time-series charts, CSV export)
+- ~~Usage metering~~ Done (API call tracking, quota management, alerts, admin overview)
+- ~~Coupon/discount system~~ Done (percentage, fixed, trial extension, redemption tracking, upgrade integration)
+- ~~Proration for mid-cycle changes~~ Done (credit/charge calculations, days remaining)
 - Stripe or Midtrans online payment integration (deferred)
-- Automatic invoice generation (deferred)
-- Usage-based billing support (deferred)
 - Trial period management (deferred)
 
 **User Invitations** (Done)
@@ -295,11 +326,13 @@ Before this project can be considered a production-ready boilerplate:
 - ~~Invitation tracking and expiry~~ Done (7-day token expiry)
 - Bulk invite support (deferred)
 
-**Analytics & Reporting**
-- Tenant usage analytics (active users, API calls, storage)
-- Super admin system-wide analytics
-- Export to CSV/PDF
-- Dashboard charts (recharts or chart.js)
+**Analytics & Reporting** (Partial)
+- ~~Tenant usage analytics (active users, API calls, storage)~~ Done (usage dashboard, quotas, trends)
+- ~~Super admin system-wide analytics~~ Done (revenue dashboard, usage overview)
+- ~~Export to CSV/PDF~~ Done (revenue CSV export, invoice PDF)
+- ~~Dashboard charts~~ Done (recharts for revenue trends, usage graphs)
+- Custom report builder (deferred)
+- Scheduled report emails (deferred)
 
 ### Quality
 
@@ -362,5 +395,7 @@ Before this project can be considered a production-ready boilerplate:
 | 13 | 2026-02-07 | SSR fix & Format settings | Fixed Next.js 16 Turbopack SSR prerender error (server/client component split pattern), implemented tenant-level format settings (currency, number, date formatting with live preview) |
 | 14 | 2026-02-12 | Subscription & Payment system | Database-driven subscription tiers (admin CRUD), manual payment system (bank transfer + QRIS), upgrade request workflow (create → proof upload → admin review → apply), 15 new endpoints, 3 new models |
 | 15 | 2026-02-12 | Payment UX & Invoice | Payment proof preview on tenant/admin pages, inline image viewing (no download), fullscreen lightbox, invoice dialog with print/PDF, billing transactions model, e-wallet payment type, tenant logo upload improvements |
+| 16 | 2026-02-13 | Billing System Enhancement | Revenue analytics (MRR/ARR/churn/ARPU, trends, CSV export), Usage metering (API tracking, quotas, alerts, middleware), Coupon system (discounts, redemptions, admin CRUD), 5 new models, 4 new services, 30+ new endpoints |
+| 17 | 2026-02-18 | Transaction Command Center | Unified billing transaction management, transaction detail page with approve/reject/coupon/discount/bonus actions, proration calculation fix for free-to-paid upgrades, bonus days applied on approval, subscription duration breakdown UX, payment proof preview with presigned URLs, invoice dialog with print/PDF |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

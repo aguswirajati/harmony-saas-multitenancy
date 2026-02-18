@@ -2,7 +2,7 @@
 Tenant Settings Endpoints for Phase 6A
 Tenant self-service operations (non-super admin)
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -10,10 +10,12 @@ from app.api.deps import get_current_tenant, verify_tenant_admin, get_current_ac
 from app.models.user import User
 from app.models.tenant import Tenant
 from app.services.tenant_service import TenantService
+from app.services.payment_service import PaymentService
 from app.schemas.tenant import (
     TenantResponse, TenantSettingsUpdate, TenantUsageResponse,
     AvailableTiers, FormatSettings
 )
+from app.schemas.payment import SubscriptionInfo
 
 router = APIRouter(prefix="/tenant-settings", tags=["Tenant Settings"])
 
@@ -24,12 +26,60 @@ def get_my_tenant(
 ):
     """
     Get current tenant information
-    
+
     **Available to all authenticated users**
-    
+
     Returns the tenant information for the currently logged-in user
     """
     return current_tenant
+
+
+@router.get("/subscription", response_model=SubscriptionInfo)
+def get_subscription_info(
+    db: Session = Depends(get_db),
+    current_tenant: Tenant = Depends(get_current_tenant)
+):
+    """
+    Get subscription information for the tenant
+
+    **Available to all authenticated users**
+
+    Returns:
+    - Current tier and billing period
+    - Subscription validity period (start/end dates)
+    - Days remaining in current period
+    - Credit balance
+    - Scheduled tier change (if any downgrade is scheduled)
+    """
+    service = PaymentService(db)
+    return service.get_subscription_info(current_tenant.id)
+
+
+@router.post("/subscription/cancel-scheduled")
+def cancel_scheduled_downgrade(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_tenant: Tenant = Depends(get_current_tenant),
+    current_user: User = Depends(verify_tenant_admin)
+):
+    """
+    Cancel a scheduled downgrade
+
+    **Tenant Admin Only**
+
+    Cancels a pending tier downgrade that was scheduled for the end of
+    the billing period.
+    """
+    service = PaymentService(db)
+    tenant = service.cancel_scheduled_downgrade(
+        tenant_id=current_tenant.id,
+        user_id=current_user.id,
+        request=request,
+    )
+    return {
+        "message": "Scheduled downgrade cancelled",
+        "tier": tenant.tier,
+    }
 
 
 @router.get("/usage", response_model=TenantUsageResponse)

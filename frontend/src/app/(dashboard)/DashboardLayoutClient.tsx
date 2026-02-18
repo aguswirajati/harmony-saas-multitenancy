@@ -13,6 +13,7 @@ import {
   X,
   ScrollText,
   ArrowUpCircle,
+  Activity,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
@@ -41,6 +42,7 @@ export default function DashboardLayoutClient({
       { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { name: 'Branches', href: '/branches', icon: Building2 },
       { name: 'Users', href: '/users', icon: Users },
+      { name: 'Usage', href: '/usage', icon: Activity },
       { name: 'Settings', href: '/settings', icon: Settings },
       { name: 'Upgrade', href: '/upgrade', icon: ArrowUpCircle },
     ];

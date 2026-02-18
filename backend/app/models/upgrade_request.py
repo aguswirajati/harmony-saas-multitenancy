@@ -28,6 +28,12 @@ class BillingPeriod:
     YEARLY = "yearly"
 
 
+class RequestType:
+    """Request type constants"""
+    UPGRADE = "upgrade"
+    DOWNGRADE = "downgrade"
+
+
 def generate_request_number() -> str:
     """Generate a unique request number"""
     now = datetime.now(timezone.utc)
@@ -70,6 +76,14 @@ class UpgradeRequest(Base, TenantScopedModel):
         comment="Requested target tier code"
     )
 
+    # Request type (upgrade or downgrade)
+    request_type = Column(
+        String(20),
+        nullable=False,
+        default=RequestType.UPGRADE,
+        comment="Request type: upgrade or downgrade"
+    )
+
     # Pricing snapshot (captured at request time)
     billing_period = Column(
         String(20),
@@ -80,13 +94,64 @@ class UpgradeRequest(Base, TenantScopedModel):
     amount = Column(
         Integer,
         nullable=False,
-        comment="Amount to be paid in smallest currency unit"
+        comment="Amount to be paid in smallest currency unit (after proration)"
     )
     currency = Column(
         String(3),
         default="IDR",
         nullable=False,
         comment="ISO 4217 currency code"
+    )
+
+    # Proration fields
+    original_amount = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Full tier price before proration"
+    )
+    proration_credit = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Credit from unused days of current tier"
+    )
+    proration_charge = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Charge for remaining days at new tier"
+    )
+    days_remaining = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Days remaining in billing period at request time"
+    )
+
+    # Coupon/discount fields
+    coupon_code = Column(
+        String(50),
+        nullable=True,
+        comment="Applied coupon code"
+    )
+    discount_amount = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Discount amount from coupon"
+    )
+    final_amount = Column(
+        Integer,
+        nullable=True,
+        comment="Final amount after discount (amount - discount_amount)"
+    )
+
+    # Effective date (for scheduled downgrades)
+    effective_date = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When tier change takes effect (immediate for upgrade, end of period for downgrade)"
     )
 
     # Snapshot of tier details for historical record
@@ -182,6 +247,7 @@ class UpgradeRequest(Base, TenantScopedModel):
         Index("ix_upgrade_requests_tenant_status", "tenant_id", "status"),
         Index("ix_upgrade_requests_status_created", "status", "created_at"),
         Index("ix_upgrade_requests_tenant_created", "tenant_id", "created_at"),
+        Index("ix_upgrade_requests_request_type", "request_type"),
     )
 
     def __repr__(self):
@@ -229,6 +295,21 @@ class UpgradeRequest(Base, TenantScopedModel):
         if self.expires_at and self.status == UpgradeRequestStatus.PENDING:
             return datetime.now(timezone.utc) > self.expires_at
         return False
+
+    @property
+    def is_upgrade(self) -> bool:
+        """Check if this is an upgrade request"""
+        return self.request_type == RequestType.UPGRADE
+
+    @property
+    def is_downgrade(self) -> bool:
+        """Check if this is a downgrade request"""
+        return self.request_type == RequestType.DOWNGRADE
+
+    @property
+    def is_scheduled(self) -> bool:
+        """Check if this is a scheduled change (downgrade)"""
+        return self.effective_date is not None and self.effective_date > datetime.now(timezone.utc)
 
     @classmethod
     def calculate_expiry(cls, days: int = 3) -> datetime:

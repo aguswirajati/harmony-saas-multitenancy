@@ -4,6 +4,13 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.models.base import BaseModel
 
+
+class BillingPeriodType:
+    """Billing period type constants"""
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
 class Tenant(Base, BaseModel):
     __tablename__ = "tenants"
 
@@ -18,6 +25,37 @@ class Tenant(Base, BaseModel):
     subscription_status = Column(String(50), default='active')
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
     subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Subscription tracking for proration
+    subscription_started_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When current subscription period started"
+    )
+    billing_period = Column(
+        String(20),
+        default=BillingPeriodType.MONTHLY,
+        nullable=True,
+        comment="Billing period: monthly or yearly"
+    )
+    credit_balance = Column(
+        Integer,
+        default=0,
+        nullable=False,
+        comment="Credit balance in smallest currency unit"
+    )
+
+    # Scheduled tier change (for downgrades)
+    scheduled_tier_code = Column(
+        String(50),
+        nullable=True,
+        comment="Tier code scheduled for next billing period"
+    )
+    scheduled_tier_effective_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When scheduled tier change takes effect"
+    )
 
     # Limits based on tier
     max_users = Column(Integer, default=5)
@@ -41,3 +79,13 @@ class Tenant(Base, BaseModel):
 
     def __repr__(self):
         return f"<Tenant {self.name} ({self.subdomain})>"
+
+    @property
+    def has_scheduled_change(self) -> bool:
+        """Check if tenant has a scheduled tier change"""
+        return self.scheduled_tier_code is not None
+
+    def clear_scheduled_change(self) -> None:
+        """Clear scheduled tier change"""
+        self.scheduled_tier_code = None
+        self.scheduled_tier_effective_at = None

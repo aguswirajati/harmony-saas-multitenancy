@@ -28,6 +28,14 @@ Enterprise-grade multi-tenant SaaS boilerplate with branch management, built wit
 - Cross-tenant user listing
 - Audit log viewer
 - Database tools (seed, reset)
+- **Transaction Command Center** - unified billing transaction management
+  - Approve/reject transactions with payment proof verification
+  - Apply coupons, manual discounts, and bonus days
+  - Add admin notes, view detailed transaction history
+  - Subscription duration breakdown with proration details
+- Revenue analytics (MRR, ARR, churn rate, ARPU, trends, CSV export)
+- Usage metering overview (system-wide and per-tenant)
+- Coupon management (create, edit, delete, view statistics)
 
 ### Tenant Dashboard
 - Organization settings (name, domain, logo)
@@ -37,6 +45,20 @@ Enterprise-grade multi-tenant SaaS boilerplate with branch management, built wit
 - Subscription usage overview
 - Tier limit pre-check dialogs
 - Dark/light theme switcher
+- Usage dashboard (API calls, quotas, alerts, trends)
+- Upgrade wizard with coupon code support
+
+### Billing & Subscription
+- Database-driven subscription tiers (admin CRUD)
+- Manual payment system (bank transfer, QRIS, e-wallet)
+- Upgrade request workflow (create → proof upload → admin review)
+- **Transaction Command Center** - unified billing management with approve/reject/coupon/discount/bonus actions
+- Proration for mid-cycle plan changes with bonus day support
+- Invoice/receipt generation with print/PDF
+- Revenue analytics dashboard (MRR, ARR, churn, ARPU)
+- Usage-based metering with quota alerts
+- Coupon/discount system (percentage, fixed amount, trial extension)
+- Subscription duration breakdown with estimated end date
 
 ### Infrastructure
 - Comprehensive audit logging (all CRUD, auth events, security events)
@@ -51,7 +73,7 @@ Enterprise-grade multi-tenant SaaS boilerplate with branch management, built wit
 - Performance benchmarking script
 
 ### Testing
-- **73 backend tests** — tenant isolation, auth flows, service layer (pytest + PostgreSQL)
+- **118 backend tests** — tenant isolation, auth flows, service layer, file storage (pytest + PostgreSQL)
 - **22 E2E tests** — registration, login, forgot-password, dashboard, navigation (Playwright)
 - CI/CD: GitHub Actions with automated lint, build, and E2E pipelines
 

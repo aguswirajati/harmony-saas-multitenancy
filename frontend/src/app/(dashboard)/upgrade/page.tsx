@@ -59,6 +59,7 @@ import type {
   BillingPeriod,
   UpgradeRequest,
   InvoiceData,
+  UpgradePreview,
 } from '@/types/payment';
 import { formatCurrency, getStatusColor, getStatusLabel } from '@/types/payment';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -88,6 +89,8 @@ export default function UpgradePage() {
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
+  const [preview, setPreview] = useState<UpgradePreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   // Fetch existing requests
   const { data: existingRequests, isLoading: requestsLoading } = useQuery({
@@ -118,12 +121,31 @@ export default function UpgradePage() {
   const tiers = tiersData?.tiers || [];
   const currentTierCode = tenant?.tier || 'free';
 
-  // Filter tiers to only show upgrades
-  const availableTiers = tiers.filter(
-    (tier) =>
-      tier.code !== currentTierCode &&
-      tier.price_monthly > (tiers.find((t) => t.code === currentTierCode)?.price_monthly || 0)
-  );
+  // Show all tiers except current (allow both upgrades and downgrades)
+  const availableTiers = tiers.filter((tier) => tier.code !== currentTierCode);
+
+  // Fetch preview when tier and billing period are selected
+  useEffect(() => {
+    const fetchPreview = async () => {
+      if (!selectedTier || step === 'tier') return;
+
+      setIsLoadingPreview(true);
+      try {
+        const previewData = await upgradeRequestsAPI.tenant.preview(
+          selectedTier.code,
+          billingPeriod
+        );
+        setPreview(previewData);
+      } catch {
+        console.error('Failed to load preview');
+        setPreview(null);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    };
+
+    fetchPreview();
+  }, [selectedTier, billingPeriod, step]);
 
   // Create mutation
   const createMutation = useMutation({
@@ -131,15 +153,20 @@ export default function UpgradePage() {
       upgradeRequestsAPI.tenant.create({
         target_tier_code: selectedTier!.code,
         billing_period: billingPeriod,
-        payment_method_id: selectedPaymentMethod!.id,
+        // Payment method required for upgrades, optional for downgrades
+        payment_method_id: preview?.requires_payment ? selectedPaymentMethod!.id : (selectedPaymentMethod?.id || undefined),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant-upgrade-requests'] });
-      toast.success('Upgrade request created!');
+      queryClient.invalidateQueries({ queryKey: ['subscription-info'] });
+      const message = preview?.request_type === 'downgrade'
+        ? 'Downgrade scheduled successfully!'
+        : 'Upgrade request created!';
+      toast.success(message);
       resetWizard();
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create upgrade request');
+      toast.error(error.message || 'Failed to create request');
     },
   });
 
@@ -305,6 +332,26 @@ export default function UpgradePage() {
       ? '#fee2e2'
       : '#fef9c3';
 
+    // Build line items HTML
+    const lineItemsHtml = invoiceData.line_items?.length > 0
+      ? invoiceData.line_items.map(item => `
+          <tr>
+            <td>
+              <div class="item-desc" style="${item.is_credit ? 'color: #16a34a;' : ''}">${item.description}</div>
+            </td>
+            <td style="${item.is_credit ? 'color: #16a34a;' : ''}">${formatCurrency(item.amount, invoiceData.currency)}</td>
+          </tr>
+        `).join('')
+      : `
+          <tr>
+            <td>
+              <div class="item-desc">${invoiceData.description}</div>
+              <div class="item-billing">Billing: ${invoiceData.billing_period}</div>
+            </td>
+            <td>${formatCurrency(invoiceData.amount, invoiceData.currency)}</td>
+          </tr>
+        `;
+
     const invoiceHtml = `
       <!DOCTYPE html>
       <html>
@@ -371,18 +418,12 @@ export default function UpgradePage() {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>
-                <div class="item-desc">${invoiceData.description}</div>
-                <div class="item-billing">Billing: ${invoiceData.billing_period}</div>
-              </td>
-              <td>${formatCurrency(invoiceData.amount, invoiceData.currency)}</td>
-            </tr>
+            ${lineItemsHtml}
           </tbody>
           <tfoot>
             <tr>
               <td>Total</td>
-              <td>${formatCurrency(invoiceData.amount, invoiceData.currency)}</td>
+              <td>${formatCurrency(invoiceData.total || invoiceData.amount, invoiceData.currency)}</td>
             </tr>
           </tfoot>
         </table>
@@ -424,6 +465,8 @@ export default function UpgradePage() {
       case 'billing':
         return true;
       case 'payment':
+        // Payment method required only for upgrades that need payment
+        if (preview?.requires_payment === false) return true;
         return !!selectedPaymentMethod;
       case 'confirm':
         return true;
@@ -431,6 +474,9 @@ export default function UpgradePage() {
         return false;
     }
   };
+
+  // Check if this is a downgrade (no payment required)
+  const isDowngrade = preview?.request_type === 'downgrade';
 
   const nextStep = () => {
     switch (step) {
@@ -1100,17 +1146,46 @@ export default function UpgradePage() {
           )}
 
           {/* Step 4: Confirm */}
-          {step === 'confirm' && selectedTier && selectedPaymentMethod && (
+          {step === 'confirm' && selectedTier && (preview?.requires_payment === false || selectedPaymentMethod) && (
             <div className="space-y-6 max-w-md mx-auto">
+              {isLoadingPreview ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+              <>
               <div className="text-center mb-6">
-                <h2 className="text-xl font-semibold">Confirm Your Order</h2>
-                <p className="text-sm text-muted-foreground">Review your upgrade details</p>
+                <h2 className="text-xl font-semibold">
+                  {isDowngrade ? 'Confirm Downgrade' : 'Confirm Your Order'}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {isDowngrade
+                    ? 'Review your plan change details'
+                    : 'Review your upgrade details'}
+                </p>
               </div>
+
+              {/* Downgrade Notice */}
+              {isDowngrade && preview?.effective_date && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <p className="font-medium text-amber-700 dark:text-amber-400">
+                      Scheduled Change
+                    </p>
+                  </div>
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    Your plan will change to <strong>{selectedTier.display_name}</strong> on{' '}
+                    <strong>{format(new Date(preview.effective_date), 'PPP')}</strong>.
+                    You will continue to have access to your current plan features until then.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-4 p-4 bg-muted rounded-lg">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Current Plan</span>
-                  <span className="font-medium">{currentTierCode}</span>
+                  <span className="font-medium">{preview?.current_tier_name || currentTierCode}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">New Plan</span>
@@ -1120,47 +1195,86 @@ export default function UpgradePage() {
                   <span className="text-muted-foreground">Billing Period</span>
                   <span className="font-medium capitalize">{billingPeriod}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Payment Method</span>
-                  <span className="font-medium">{selectedPaymentMethod.name}</span>
-                </div>
+                {selectedPaymentMethod && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Payment Method</span>
+                    <span className="font-medium">{selectedPaymentMethod.name}</span>
+                  </div>
+                )}
+
+                {/* Proration Breakdown for Upgrades */}
+                {!isDowngrade && preview && preview.days_remaining > 0 && (
+                  <>
+                    <hr />
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          {selectedTier.display_name} ({preview.days_remaining} days)
+                        </span>
+                        <span>{formatCurrency(preview.proration_charge, selectedTier.currency)}</span>
+                      </div>
+                      {preview.proration_credit > 0 && (
+                        <div className="flex justify-between text-green-600 dark:text-green-400">
+                          <span>Credit: {preview.current_tier_name} unused ({preview.days_remaining} days)</span>
+                          <span>-{formatCurrency(preview.proration_credit, selectedTier.currency)}</span>
+                        </div>
+                      )}
+                      {preview.credit_to_apply > 0 && (
+                        <div className="flex justify-between text-green-600 dark:text-green-400">
+                          <span>Credit Balance Applied</span>
+                          <span>-{formatCurrency(preview.credit_to_apply, selectedTier.currency)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
                 <hr />
                 <div className="flex justify-between text-lg">
-                  <span className="font-semibold">Total Amount</span>
+                  <span className="font-semibold">
+                    {isDowngrade ? 'Amount Due' : 'Total Amount'}
+                  </span>
                   <span className="font-bold">
-                    {formatCurrency(getAmount(), selectedTier.currency)}
+                    {isDowngrade
+                      ? formatCurrency(0, selectedTier.currency)
+                      : formatCurrency(preview?.amount_due || getAmount(), selectedTier.currency)}
                   </span>
                 </div>
               </div>
 
-              {/* Payment Instructions */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Payment Instructions</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm">
-                  {selectedPaymentMethod.type === 'bank_transfer' ? (
-                    <div className="space-y-2">
-                      <p>Transfer to:</p>
-                      <div className="p-3 bg-muted rounded-lg space-y-1">
-                        <p className="font-medium">{selectedPaymentMethod.bank_name}</p>
-                        <p className="font-mono text-lg">{selectedPaymentMethod.account_number}</p>
-                        <p>{selectedPaymentMethod.account_name}</p>
+              {/* Payment Instructions (only for upgrades with payment required) */}
+              {!isDowngrade && selectedPaymentMethod && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Payment Instructions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    {selectedPaymentMethod.type === 'bank_transfer' ? (
+                      <div className="space-y-2">
+                        <p>Transfer to:</p>
+                        <div className="p-3 bg-muted rounded-lg space-y-1">
+                          <p className="font-medium">{selectedPaymentMethod.bank_name}</p>
+                          <p className="font-mono text-lg">{selectedPaymentMethod.account_number}</p>
+                          <p>{selectedPaymentMethod.account_name}</p>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <p>QRIS code will be shown after confirmation.</p>
-                  )}
-                  {selectedPaymentMethod.instructions && (
-                    <p className="mt-3 text-muted-foreground">{selectedPaymentMethod.instructions}</p>
-                  )}
-                </CardContent>
-              </Card>
+                    ) : (
+                      <p>QRIS code will be shown after confirmation.</p>
+                    )}
+                    {selectedPaymentMethod.instructions && (
+                      <p className="mt-3 text-muted-foreground">{selectedPaymentMethod.instructions}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <p className="text-xs text-center text-muted-foreground">
-                After creating the request, you&apos;ll need to upload proof of payment. The upgrade
-                will be applied after admin approval.
+                {isDowngrade
+                  ? 'The plan change will take effect at the end of your current billing period. No payment is required.'
+                  : "After creating the request, you'll need to upload proof of payment. The upgrade will be applied after admin approval."}
               </p>
+              </>
+              )}
             </div>
           )}
         </CardContent>

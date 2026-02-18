@@ -209,6 +209,14 @@ class AuditAction:
     UPGRADE_REJECTED = "upgrade.rejected"
     UPGRADE_CANCELLED = "upgrade.cancelled"
 
+    # Billing Transactions (Command Center)
+    BILLING_TRANSACTION_APPROVED = "billing.transaction_approved"
+    BILLING_TRANSACTION_REJECTED = "billing.transaction_rejected"
+    COUPON_APPLIED = "billing.coupon_applied"
+    DISCOUNT_APPLIED = "billing.discount_applied"
+    BONUS_DAYS_ADDED = "billing.bonus_days_added"
+    MANUAL_TRANSACTION_CREATED = "billing.manual_transaction_created"
+
 
 # Status constants
 class AuditStatus:

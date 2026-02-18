@@ -12,15 +12,14 @@ import {
   LogOut,
   Menu,
   X,
-  TrendingUp,
   Shield,
   Database,
   Wrench,
   Crown,
   Bug,
   Layers,
-  CreditCard,
-  ArrowUpCircle,
+  Receipt,
+  BarChart3,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
@@ -64,11 +63,10 @@ export default function AdminLayoutClient({
     { name: 'Tenants', href: '/admin/tenants', icon: Building2 },
     { name: 'All Users', href: '/admin/users', icon: Users },
     { name: 'Subscriptions', href: '/admin/subscriptions', icon: Crown },
-    { name: 'Tiers', href: '/admin/tiers', icon: Layers },
-    { name: 'Payment Methods', href: '/admin/payment-methods', icon: CreditCard },
-    { name: 'Upgrade Requests', href: '/admin/upgrade-requests', icon: ArrowUpCircle },
+    { name: 'Pricing', href: '/admin/pricing', icon: Layers },
+    { name: 'Billing', href: '/admin/billing', icon: Receipt },
+    { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Audit Logs', href: '/admin/logs', icon: Shield },
-    { name: 'Statistics', href: '/admin/stats', icon: TrendingUp },
   ];
 
   const devNavigation = [

@@ -147,6 +147,41 @@ export interface PublicPaymentMethod {
 }
 
 // ============================================================================
+// PRORATION TYPES
+// ============================================================================
+
+export interface ProrationBreakdown {
+  days_remaining: number;
+  current_daily_rate: number;
+  new_daily_rate: number;
+  proration_credit: number;
+  proration_charge: number;
+  net_amount: number;
+  credit_balance_available: number;
+  credit_to_apply: number;
+  amount_due: number;
+  original_amount: number;
+}
+
+export interface ScheduledChange {
+  tier_code: string;
+  tier_name: string | null;
+  effective_at: string;
+  days_until: number;
+}
+
+export interface SubscriptionInfo {
+  tier_code: string;
+  tier_name: string;
+  billing_period: BillingPeriod;
+  subscription_started_at: string | null;
+  subscription_ends_at: string | null;
+  days_remaining: number;
+  credit_balance: number;
+  scheduled_change: ScheduledChange | null;
+}
+
+// ============================================================================
 // UPGRADE REQUESTS
 // ============================================================================
 
@@ -161,10 +196,13 @@ export type UpgradeRequestStatus =
 
 export type BillingPeriod = 'monthly' | 'yearly';
 
+export type RequestType = 'upgrade' | 'downgrade';
+
 export interface UpgradeRequest {
   id: string;
   request_number: string;
   tenant_id: string;
+  request_type: RequestType;
   current_tier_code: string;
   target_tier_code: string;
   current_tier_name: string | null;
@@ -172,6 +210,13 @@ export interface UpgradeRequest {
   billing_period: BillingPeriod;
   amount: number;
   currency: string;
+  // Proration fields
+  original_amount: number;
+  proration_credit: number;
+  proration_charge: number;
+  days_remaining: number;
+  effective_date: string | null;
+  // Payment fields
   payment_method_id: string | null;
   payment_method_name: string | null;
   payment_proof_file_id: string | null;
@@ -194,7 +239,7 @@ export interface UpgradeRequest {
 export interface UpgradeRequestCreate {
   target_tier_code: string;
   billing_period: BillingPeriod;
-  payment_method_id: string;
+  payment_method_id?: string;
 }
 
 export interface UpgradeRequestUpdate {
@@ -214,6 +259,7 @@ export interface UpgradeRequestSummary {
   request_number: string;
   tenant_id: string;
   tenant_name: string | null;
+  request_type: RequestType;
   current_tier_code: string;
   target_tier_code: string;
   billing_period: BillingPeriod;
@@ -222,6 +268,7 @@ export interface UpgradeRequestSummary {
   status: UpgradeRequestStatus;
   has_payment_proof: boolean;
   expires_at: string | null;
+  effective_date: string | null;
   created_at: string;
 }
 
@@ -239,6 +286,17 @@ export interface UpgradePreview {
     max_branches: number;
     max_storage_gb: number;
   };
+  // Proration fields
+  request_type: RequestType;
+  days_remaining: number;
+  proration_credit: number;
+  proration_charge: number;
+  credit_balance_available: number;
+  credit_to_apply: number;
+  amount_due: number;
+  original_amount: number;
+  effective_date: string | null;
+  requires_payment: boolean;
 }
 
 export interface UpgradeRequestStats {
@@ -277,6 +335,14 @@ export interface TenantUpgradeRequestListResponse {
   total: number;
 }
 
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  is_credit: boolean;
+}
+
 export interface InvoiceData {
   transaction_number: string;
   invoice_date: string;
@@ -287,11 +353,205 @@ export interface InvoiceData {
   seller_email: string | null;
   buyer_name: string;
   buyer_email: string | null;
+  // Line items for proration breakdown
+  line_items: InvoiceLineItem[];
+  subtotal: number;
+  credit_applied: number;
+  total: number;
+  // Legacy fields
   description: string;
   billing_period: BillingPeriod;
   amount: number;
   currency: string;
+  // Period dates
+  period_start: string | null;
+  period_end: string | null;
   payment_method_name: string | null;
+}
+
+export interface BillingTransaction {
+  id: string;
+  transaction_number: string;
+  tenant_id: string;
+  tenant_name: string | null;
+  upgrade_request_id: string | null;
+  transaction_type: 'subscription' | 'upgrade' | 'downgrade' | 'renewal' | 'credit';
+  amount: number;
+  original_amount: number;
+  credit_applied: number;
+  credit_generated: number;
+  currency: string;
+  billing_period: BillingPeriod;
+  period_start: string | null;
+  period_end: string | null;
+  proration_details: ProrationBreakdown | null;
+  payment_method_id: string | null;
+  payment_method_name: string | null;
+  status: 'pending' | 'paid' | 'cancelled' | 'refunded';
+  invoice_date: string;
+  paid_at: string | null;
+  cancelled_at: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface BillingTransactionListResponse {
+  items: BillingTransaction[];
+  total: number;
+}
+
+export interface BillingStats {
+  total_revenue: number;
+  total_revenue_this_month: number;
+  pending_amount: number;
+  credits_issued: number;
+  transaction_count: number;
+  paid_count: number;
+  pending_count: number;
+  requires_review_count: number;
+  currency: string;
+}
+
+// ============================================================================
+// TRANSACTION MANAGEMENT TYPES (Command Center)
+// ============================================================================
+
+export type TransactionType =
+  | 'subscription'
+  | 'upgrade'
+  | 'downgrade'
+  | 'renewal'
+  | 'credit'
+  | 'credit_adjustment'
+  | 'extension'
+  | 'promo'
+  | 'refund'
+  | 'manual';
+
+export type TransactionStatus = 'pending' | 'paid' | 'cancelled' | 'rejected' | 'refunded';
+
+export interface BillingTransactionDetail {
+  id: string;
+  transaction_number: string;
+  tenant_id: string;
+  tenant_name: string | null;
+  tenant_subdomain: string | null;
+
+  // Request link
+  upgrade_request_id: string | null;
+  request_number: string | null;
+  request_status: UpgradeRequestStatus | null;
+  has_payment_proof: boolean;
+  payment_proof_file_id: string | null;
+
+  // Transaction type and status
+  transaction_type: TransactionType;
+  status: TransactionStatus;
+  requires_review: boolean;
+  can_approve: boolean;
+  can_reject: boolean;
+
+  // Amounts
+  amount: number;
+  original_amount: number;
+  credit_applied: number;
+  credit_generated: number;
+  discount_amount: number;
+  net_amount: number;
+  currency: string;
+
+  // Coupon/discount info
+  coupon_id: string | null;
+  coupon_code: string | null;
+  discount_description: string | null;
+
+  // Bonus
+  bonus_days: number;
+
+  // Billing period
+  billing_period: BillingPeriod;
+  period_start: string | null;
+  period_end: string | null;
+  proration_details: ProrationBreakdown | null;
+
+  // Payment method
+  payment_method_id: string | null;
+  payment_method_name: string | null;
+
+  // Dates
+  invoice_date: string;
+  paid_at: string | null;
+  cancelled_at: string | null;
+  rejected_at: string | null;
+  adjusted_at: string | null;
+
+  // Admin fields
+  admin_notes: string | null;
+  rejection_reason: string | null;
+  adjusted_by_id: string | null;
+  adjusted_by_name: string | null;
+  rejected_by_id: string | null;
+  rejected_by_name: string | null;
+
+  // Description
+  description: string | null;
+
+  // Timestamps
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface BillingTransactionDetailListResponse {
+  items: BillingTransactionDetail[];
+  total: number;
+  page: number;
+  page_size: number;
+  requires_review_count: number;
+}
+
+// Transaction Management Request Types
+
+export interface TransactionApproveRequest {
+  notes?: string;
+}
+
+export interface TransactionRejectRequest {
+  rejection_reason: string;
+  notes?: string;
+}
+
+export interface TransactionApplyCouponRequest {
+  coupon_code: string;
+  notes?: string;
+}
+
+export interface TransactionApplyDiscountRequest {
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  description?: string;
+  notes?: string;
+}
+
+export interface TransactionAddBonusRequest {
+  bonus_days: number;
+  reason?: string;
+  notes?: string;
+}
+
+export interface TransactionAddNoteRequest {
+  notes: string;
+}
+
+export interface ManualTransactionCreateRequest {
+  tenant_id: string;
+  transaction_type: 'credit_adjustment' | 'extension' | 'promo' | 'refund' | 'manual';
+  amount?: number;
+  currency?: string;
+  description: string;
+  credit_adjustment?: number;
+  bonus_days?: number;
+  discount_amount?: number;
+  notes?: string;
 }
 
 // ============================================================================

@@ -5,13 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Current Project Status
 
 **Phase 1 (Critical Foundation): 100% complete.**
+**Phase 2 (Billing & Subscription System): 100% complete.**
 
 What's built:
-- 90+ API endpoints across 16 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests, files)
-- 26 frontend pages (6 public, 6 dashboard, 14 admin)
-- 9 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest, BillingTransaction) + BaseModel and TenantScopedModel abstract bases
-- 8 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment)
-- 3 middleware (rate limiter, error handler, request logger)
+- 155+ API endpoints across 20 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests, files, admin-billing, admin-revenue, usage, coupons)
+- 31 frontend pages (6 public, 7 dashboard, 18 admin)
+- 14 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest, BillingTransaction, UsageRecord, UsageQuota, UsageAlert, Coupon, CouponRedemption) + BaseModel and TenantScopedModel abstract bases
+- 12 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment, Revenue, Usage, Proration, Coupon)
+- 4 middleware (rate limiter, error handler, request logger, usage tracking)
 - 6 input validators (password, subdomain, email, name, SQL injection, XSS)
 - Permission matrix (RBAC with `require_permission` dependency + `usePermission` hook)
 - Dark/light theme switcher (next-themes)
@@ -22,13 +23,17 @@ What's built:
 - Manual payment system (bank transfer + QRIS + e-wallet, proof upload, admin review workflow)
 - File storage system (S3/MinIO, presigned URLs, tenant logo, user avatar, payment proof)
 - Invoice/receipt generation with print/PDF support
+- **Transaction Command Center** (unified billing management: approve/reject, coupon/discount/bonus, proration with bonus days)
+- Revenue analytics (MRR, ARR, churn rate, ARPU, time-series charts, CSV export)
+- Usage metering (API call tracking, quotas, alerts, middleware-based tracking)
+- Coupon/discount system (percentage, fixed amount, trial extension, redemption tracking)
 - Performance benchmark script
-- 73 backend tests (tenant isolation, auth, services, authorization) - all passing
+- 118 backend tests (tenant isolation, auth, services, authorization, files) - all passing
 - 20 Playwright E2E tests passing + 2 fixme (registration, login, dashboard, navigation)
 - Docker setup (Dockerfiles + docker-compose for local dev)
 - CI/CD (GitHub Actions for backend lint/test, frontend lint/build/e2e)
 
-What's NOT built yet (Phase 2+): notifications, i18n, online payment integration (Stripe/Midtrans).
+What's NOT built yet (Phase 3+): notifications, i18n, online payment integration (Stripe/Midtrans).
 
 For full status details, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
 
@@ -58,7 +63,7 @@ alembic current                         # Show current migration version
 alembic history                         # Show migration history
 
 # Run tests (requires harmony_test PostgreSQL database)
-pytest                                  # Run all tests (73 tests)
+pytest                                  # Run all tests (118 tests)
 pytest -v                              # Verbose output
 pytest tests/test_tenant_isolation/ -v # Tenant isolation tests only
 pytest tests/test_auth/ -v            # Auth tests only
@@ -436,6 +441,77 @@ class FormatSettings(BaseModel):
 - `useFormatSettings()` - Full CRUD hook with mutation
 - `useFormatters()` - Lightweight read-only hook for formatting
 
+### Billing & Subscription System
+
+**Revenue Analytics** (`backend/app/services/revenue_service.py`):
+- `calculate_mrr()` - Monthly recurring revenue from active paid subscriptions
+- `calculate_arr()` - Annual recurring revenue (MRR × 12)
+- `calculate_churn_rate()` - Percentage of churned subscriptions in period
+- `calculate_arpu()` - Average revenue per user
+- `get_revenue_trends()` - Time-series data for charts (daily/weekly/monthly)
+- `get_revenue_breakdown()` - Revenue by tier, billing period, transaction type
+- `export_revenue_csv()` - CSV download of revenue data
+
+**API Endpoints** (`backend/app/api/v1/endpoints/admin_revenue.py`):
+- `GET /api/v1/admin/revenue/stats` - Dashboard metrics (MRR, ARR, churn, ARPU)
+- `GET /api/v1/admin/revenue/trends` - Time-series data for charts
+- `GET /api/v1/admin/revenue/export` - CSV download
+
+### Usage Metering System
+
+**Models** (`backend/app/models/usage.py`):
+- `UsageRecord` - Individual usage data points (metric_type, value, recorded_at)
+- `UsageQuota` - Per-tenant quotas with alerts (quota_limit, current_usage, alert_threshold)
+- `UsageAlert` - Threshold breach notifications (threshold_percent, message, is_dismissed)
+
+**Service** (`backend/app/services/usage_service.py`):
+- `increment_usage()` - Increment usage counter for a metric
+- `get_tenant_usage_summary()` - Current usage vs quotas
+- `check_quota_alerts()` - Generate alerts when thresholds exceeded
+- `get_usage_trends()` - Historical usage data for charts
+- `set_quota()` - Admin sets tenant quota limits
+
+**Middleware** (`backend/app/middleware/usage_tracking.py`):
+- Automatic API call tracking per tenant
+- Excludes auth, public, and health endpoints
+- Extracts tenant_id from JWT or request state
+
+**API Endpoints**:
+- Tenant: `/api/v1/usage/summary`, `/usage/quotas`, `/usage/trends/{metric}`, `/usage/alerts`
+- Admin: `/api/v1/admin/usage/overview`, `/admin/usage/tenants`, `/admin/usage/tenants/{id}/quotas`
+
+### Coupon & Discount System
+
+**Models** (`backend/app/models/coupon.py`):
+- `Coupon` - Promotional codes with validation rules
+- `CouponRedemption` - Track coupon usage per tenant
+
+**Discount Types**:
+- `percentage` - Percentage off (e.g., 20% off)
+- `fixed_amount` - Fixed amount discount (e.g., IDR 50,000 off)
+- `trial_extension` - Extra trial days
+
+**Coupon Features**:
+- Maximum total redemptions (`max_redemptions`)
+- Per-tenant redemption limits (`max_redemptions_per_tenant`)
+- Tier restrictions (`valid_for_tiers`)
+- Billing period restrictions (`valid_for_billing_periods`)
+- Validity date range (`valid_from`, `valid_until`)
+- First-time subscription only (`first_time_only`)
+- New customers only (`new_customers_only`)
+- Duration-based discounts (`duration_months`)
+- Minimum purchase amount (`minimum_amount`)
+
+**Service** (`backend/app/services/coupon_service.py`):
+- `validate_coupon()` - Check if coupon is valid for tenant/tier/amount
+- `apply_coupon()` - Apply discount to upgrade request
+- `get_coupon_statistics()` - Redemption stats per coupon
+- `get_overview_stats()` - System-wide coupon metrics
+
+**API Endpoints**:
+- Tenant: `POST /api/v1/coupons/validate`, `POST /coupons/apply`, `GET /coupons/my-redemptions`
+- Admin: `GET/POST /api/v1/admin/coupons/`, `GET/PUT/DELETE /admin/coupons/{id}`, `GET /admin/coupons/stats`
+
 ### Middleware Stack
 
 Registered in `backend/app/main.py`, execution order:
@@ -603,6 +679,10 @@ if current_user_count >= tenant.max_users:
 | `backend/app/services/tenant_service.py` | Tenant CRUD, subscription management, system stats |
 | `backend/app/services/audit_service.py` | Audit trail logging and querying |
 | `backend/app/services/email_service.py` | SMTP email sending with Jinja2 templates |
+| `backend/app/services/revenue_service.py` | MRR/ARR/churn/ARPU calculations, revenue trends |
+| `backend/app/services/usage_service.py` | Usage tracking, quota management, alerts |
+| `backend/app/services/coupon_service.py` | Coupon validation, redemption, statistics |
+| `backend/app/middleware/usage_tracking.py` | API call metering middleware |
 | `backend/app/core/permissions.py` | Permission enum and ROLE_PERMISSIONS mapping |
 | `backend/app/middleware/rate_limiter.py` | Redis-based rate limiting |
 | `backend/app/middleware/error_handler.py` | Global exception handler |
@@ -610,6 +690,9 @@ if current_user_count >= tenant.max_users:
 | `backend/app/models/audit_log.py` | Audit log model with action constants |
 | `frontend/src/lib/api/client.ts` | Axios client with auth interceptors & token refresh |
 | `frontend/src/lib/api/auth.ts` | Auth API calls (login, register, refresh, password reset) |
+| `frontend/src/lib/api/admin-revenue.ts` | Revenue analytics API calls |
+| `frontend/src/lib/api/usage.ts` | Usage metering API calls |
+| `frontend/src/lib/api/coupons.ts` | Coupon management API calls |
 | `frontend/src/lib/store/authStore.ts` | Zustand auth state store |
 | `frontend/src/hooks/use-permission.ts` | Frontend permission checking hook |
 | `frontend/src/hooks/use-format-settings.ts` | Format settings hook (React Query) |
@@ -647,7 +730,7 @@ if current_user_count >= tenant.max_users:
 
 ### Backend Tests
 
-**73 tests, all passing** against PostgreSQL. Uses transaction rollback per test (savepoint pattern) for speed and isolation.
+**118 tests, all passing** against PostgreSQL. Uses transaction rollback per test (savepoint pattern) for speed and isolation.
 
 #### Test Database Setup
 ```bash

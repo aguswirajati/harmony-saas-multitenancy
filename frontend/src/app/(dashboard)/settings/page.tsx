@@ -18,7 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Building2, Users, HardDrive, Check, Loader2, Save, Globe, DollarSign, Calendar, Hash } from 'lucide-react';
+import { Building2, Users, HardDrive, Check, Loader2, Save, Globe, DollarSign, Calendar, Hash, Clock, CreditCard, ArrowRight, X } from 'lucide-react';
+import Link from 'next/link';
+import { format, formatDistanceToNow } from 'date-fns';
+import type { SubscriptionInfo } from '@/types/payment';
 import {
   FormatSettings,
   DEFAULT_FORMAT_SETTINGS,
@@ -118,6 +121,8 @@ export default function SettingsPage() {
   // Subscription state
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [tiers, setTiers] = useState<AvailableTiers | null>(null);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
+  const [cancellingSchedule, setCancellingSchedule] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -127,17 +132,19 @@ export default function SettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [tenantData, usageData, tiersData, formatData] = await Promise.all([
+      const [tenantData, usageData, tiersData, formatData, subInfoData] = await Promise.all([
         apiClient.get<TenantInfo>('/tenant-settings/'),
         apiClient.get<UsageData>('/tenant-settings/usage'),
         apiClient.get<AvailableTiers>('/tenant-settings/tiers'),
         apiClient.get<FormatSettings>('/tenant-settings/format'),
+        apiClient.get<SubscriptionInfo>('/tenant-settings/subscription').catch(() => null),
       ]);
 
       setTenantInfo(tenantData);
       setUsage(usageData);
       setTiers(tiersData);
       setFormatSettings(formatData);
+      setSubscriptionInfo(subInfoData);
 
       // Populate form
       setFormName(tenantData.name);
@@ -200,6 +207,28 @@ export default function SettingsPage() {
   };
 
   const preview = getFormatPreview(formatSettings);
+
+  const handleCancelScheduledChange = async () => {
+    setCancellingSchedule(true);
+    try {
+      await apiClient.post('/tenant-settings/subscription/cancel-scheduled');
+      await loadData();
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      setError(axiosError?.response?.data?.detail || 'Failed to cancel scheduled change');
+    } finally {
+      setCancellingSchedule(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
 
   if (loading) {
     return (
@@ -583,6 +612,114 @@ export default function SettingsPage() {
 
         {/* Subscription Tab */}
         <TabsContent value="subscription" className="mt-6 space-y-6">
+          {/* Subscription Info Card */}
+          {subscriptionInfo && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Subscription Details
+                </CardTitle>
+                <CardDescription>
+                  Your current subscription information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Current Plan</p>
+                    <p className="text-lg font-semibold">{subscriptionInfo.tier_name}</p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      Billed {subscriptionInfo.billing_period}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Subscription Period</p>
+                    {subscriptionInfo.subscription_started_at && subscriptionInfo.subscription_ends_at ? (
+                      <>
+                        <p className="text-lg font-semibold">
+                          {format(new Date(subscriptionInfo.subscription_started_at), 'MMM d')} - {format(new Date(subscriptionInfo.subscription_ends_at), 'MMM d, yyyy')}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {subscriptionInfo.days_remaining} days remaining
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-lg font-semibold text-muted-foreground">Not set</p>
+                    )}
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Days Remaining</p>
+                    <p className="text-lg font-semibold">{subscriptionInfo.days_remaining}</p>
+                    {subscriptionInfo.subscription_ends_at && (
+                      <p className="text-xs text-muted-foreground">
+                        Expires {formatDistanceToNow(new Date(subscriptionInfo.subscription_ends_at), { addSuffix: true })}
+                      </p>
+                    )}
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Credit Balance</p>
+                    <p className="text-lg font-semibold">{formatCurrency(subscriptionInfo.credit_balance)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Available for future payments
+                    </p>
+                  </div>
+                </div>
+
+                {/* Scheduled Change Alert */}
+                {subscriptionInfo.scheduled_change && (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                        <div>
+                          <p className="font-medium text-amber-800 dark:text-amber-300">
+                            Scheduled Plan Change
+                          </p>
+                          <p className="text-sm text-amber-700 dark:text-amber-400">
+                            Your plan will change to <strong>{subscriptionInfo.scheduled_change.tier_name || subscriptionInfo.scheduled_change.tier_code}</strong> on{' '}
+                            <strong>{format(new Date(subscriptionInfo.scheduled_change.effective_at), 'PPP')}</strong>
+                            {subscriptionInfo.scheduled_change.days_until > 0 && (
+                              <> ({subscriptionInfo.scheduled_change.days_until} days)</>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCancelScheduledChange}
+                          disabled={cancellingSchedule}
+                          className="text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                        >
+                          {cancellingSchedule ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <X className="h-4 w-4 mr-2" />
+                          )}
+                          Cancel Change
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upgrade/Manage Button */}
+                {isAdmin && (
+                  <div className="flex justify-end">
+                    <Link href="/upgrade">
+                      <Button>
+                        Manage Subscription
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Usage Cards */}
           {usage && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

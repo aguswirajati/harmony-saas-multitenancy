@@ -43,7 +43,11 @@ interface SystemStats {
   };
 }
 
-export default function AdminStatsPage() {
+interface AdminStatsPageProps {
+  embedded?: boolean;
+}
+
+export default function AdminStatsPage({ embedded = false }: AdminStatsPageProps) {
   const { data: stats, isLoading, error } = useQuery<SystemStats>({
     queryKey: ['admin-stats'],
     queryFn: () => apiClient.get<SystemStats>('/admin/stats'),
@@ -52,8 +56,8 @@ export default function AdminStatsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 p-6">
-        <Skeleton className="h-12 w-64" />
+      <div className={embedded ? "space-y-4" : "space-y-6 p-6"}>
+        {!embedded && <Skeleton className="h-12 w-64" />}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-32" />
@@ -65,7 +69,7 @@ export default function AdminStatsPage() {
 
   if (error || !stats) {
     return (
-      <div className="p-6">
+      <div className={embedded ? "" : "p-6"}>
         <Card>
           <CardContent className="pt-6">
             <div className="text-center text-red-500">
@@ -106,12 +110,14 @@ export default function AdminStatsPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className={embedded ? "space-y-4" : "space-y-6 p-6"}>
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">System Statistics</h1>
-        <p className="text-muted-foreground">Overview of system-wide metrics and activity</p>
-      </div>
+      {!embedded && (
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">System Statistics</h1>
+          <p className="text-muted-foreground">Overview of system-wide metrics and activity</p>
+        </div>
+      )}
 
       {/* Overview Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

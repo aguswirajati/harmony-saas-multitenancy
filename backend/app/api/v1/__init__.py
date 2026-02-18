@@ -7,11 +7,15 @@ from app.api.v1.endpoints import (
     tenant_settings,
     admin_stats,
     admin_tools,
+    admin_billing,
+    admin_revenue,
     audit,
     files,
     subscription_tiers,
     payment_methods,
     upgrade_requests,
+    usage,
+    coupons,
 )
 
 router = APIRouter()
@@ -34,3 +38,13 @@ router.include_router(payment_methods.admin_router)
 router.include_router(payment_methods.public_router)
 router.include_router(upgrade_requests.tenant_router)
 router.include_router(upgrade_requests.admin_router)
+router.include_router(admin_billing.router)
+router.include_router(admin_revenue.router)
+
+# Usage metering
+router.include_router(usage.tenant_router)
+router.include_router(usage.admin_router)
+router.include_router(usage.internal_router)
+
+# Coupons
+router.include_router(coupons.router)
