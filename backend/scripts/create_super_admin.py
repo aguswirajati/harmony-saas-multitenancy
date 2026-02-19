@@ -40,17 +40,20 @@ def create_super_admin(
         print(f"❌ User with email '{email}' already exists")
         return False
     
-    # Create super admin user (no tenant_id required)
+    # Import SystemRole for new architecture
+    from app.models.user import SystemRole
+
+    # Create system admin user (no tenant_id required)
     super_admin = User(
         id=uuid4(),
-        tenant_id=None,  # Super admin has no tenant
+        tenant_id=None,  # System user has no tenant
         default_branch_id=None,
         email=email,
         password_hash=get_password_hash(password),
         first_name=first_name,
         last_name=last_name,
         full_name=f"{first_name} {last_name}",
-        role="super_admin",  # Special role
+        system_role=SystemRole.ADMIN,  # System admin role
         is_verified=True,
         is_active=True,
         permissions=[],

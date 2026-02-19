@@ -72,13 +72,15 @@ class User(Base, BaseModel):
 
     # System scope (when tenant_id IS NULL)
     system_role = Column(
-        Enum(SystemRole, name='system_role_enum', create_type=False),
+        Enum(SystemRole, name='system_role_enum', create_type=False,
+             values_callable=lambda obj: [e.value for e in obj]),
         nullable=True
     )
 
     # Tenant scope (when tenant_id IS NOT NULL)
     tenant_role = Column(
-        Enum(TenantRole, name='tenant_role_enum', create_type=False),
+        Enum(TenantRole, name='tenant_role_enum', create_type=False,
+             values_callable=lambda obj: [e.value for e in obj]),
         nullable=True
     )
 

@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from app.core.database import SessionLocal
 from app.models import Tenant, Branch, User
+from app.models.user import TenantRole, SystemRole
 from app.core.security import get_password_hash
 
 def seed_initial_data():
@@ -53,7 +54,23 @@ def seed_initial_data():
 
         print(f"✅ Created branch: {branch2.name}")
 
-        # Create admin user
+        # Create tenant owner
+        owner = User(
+            tenant_id=tenant.id,
+            email="owner@demo.com",
+            password_hash=get_password_hash("owner123"),
+            first_name="Owner",
+            last_name="User",
+            full_name="Owner User",
+            tenant_role=TenantRole.OWNER,
+            default_branch_id=hq_branch.id,
+            is_verified=True
+        )
+        db.add(owner)
+
+        print(f"✅ Created user: {owner.email} (password: owner123) [Tenant Owner]")
+
+        # Create tenant admin
         admin = User(
             tenant_id=tenant.id,
             email="admin@demo.com",
@@ -61,29 +78,44 @@ def seed_initial_data():
             first_name="Admin",
             last_name="User",
             full_name="Admin User",
-            role="admin",
+            tenant_role=TenantRole.ADMIN,
             default_branch_id=hq_branch.id,
             is_verified=True
         )
         db.add(admin)
 
-        print(f"✅ Created user: {admin.email} (password: admin123)")
+        print(f"✅ Created user: {admin.email} (password: admin123) [Tenant Admin]")
 
-        # Create staff user
-        staff = User(
+        # Create tenant member
+        member = User(
             tenant_id=tenant.id,
-            email="staff@demo.com",
-            password_hash=get_password_hash("staff123"),
-            first_name="Staff",
+            email="member@demo.com",
+            password_hash=get_password_hash("member123"),
+            first_name="Member",
             last_name="User",
-            full_name="Staff User",
-            role="staff",
+            full_name="Member User",
+            tenant_role=TenantRole.MEMBER,
             default_branch_id=branch2.id,
             is_verified=True
         )
-        db.add(staff)
+        db.add(member)
 
-        print(f"✅ Created user: {staff.email} (password: staff123)")
+        print(f"✅ Created user: {member.email} (password: member123) [Tenant Member]")
+
+        # Create system admin (no tenant)
+        sys_admin = User(
+            tenant_id=None,
+            email="sysadmin@harmony.com",
+            password_hash=get_password_hash("sysadmin123"),
+            first_name="System",
+            last_name="Admin",
+            full_name="System Admin",
+            system_role=SystemRole.ADMIN,
+            is_verified=True
+        )
+        db.add(sys_admin)
+
+        print(f"✅ Created user: {sys_admin.email} (password: sysadmin123) [System Admin]")
 
         db.commit()
         print("\n🎉 Seeding completed successfully!")
