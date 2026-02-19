@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-02-18 (Session 17)
+> Last updated: 2026-02-20 (Session 19)
 
 ---
 
@@ -258,7 +258,122 @@ Before this project can be considered a production-ready boilerplate:
 
 ---
 
-## 5. Future Implementation Guide
+## 5. Pending Tasks & Roadmap
+
+> Prioritized backlog of features, improvements, and fixes.
+
+### Priority Levels
+- **P0 (Critical)**: Bugs, broken features - must fix before release
+- **P1 (High)**: Core UX/architecture changes needed for production
+- **P2 (Medium)**: Important features and improvements
+- **P3 (Low)**: Nice-to-have, future enhancements
+
+---
+
+### P0 - Critical (Bugs & Broken Features)
+
+| ID | Task | Description | Status |
+|----|------|-------------|--------|
+| P0-1 | **Forgot password not working** | Fix `/forgot-password` page - likely email service or token flow issue | 🔴 Not Started |
+
+---
+
+### P1 - High Priority (Core Architecture & UX)
+
+| ID | Task | Description | Status |
+|----|------|-------------|--------|
+| P1-1 | **User Architecture Redesign** | System scope (System Admin, System Operator) + Tenant scope (Tenant Owner, Tenant Admin, Tenant Member). See [detailed plan](plans/P1-1-USER-ARCHITECTURE-REDESIGN.md). | ✅ Complete |
+| P1-2 | **Layout Redesign** | New layout structure: system logo top-left, top nav with page title/desc, dev_mode button, theme switcher, notification icon with dropdown, user avatar with dropdown (profile, logout) | 🔴 Not Started |
+| P1-3 | **Simplify Registration Flow** | Remove `subdomain` and `company` fields from login/register pages. Subdomain set later via tenant settings or by super admin. | 🔴 Not Started |
+| P1-4 | **Permission Matrix Enhancement** | Extend permission system to cover all boilerplate pages/features access control | 🔴 Not Started |
+| P1-5 | **Payment Provider Interface (Strategy Pattern)** | Abstract payment integration using Strategy Pattern. Support Stripe, Midtrans, manual payment, and other providers. User selects active provider in settings. | 🔴 Not Started |
+
+---
+
+### P2 - Medium Priority (Feature Improvements)
+
+| ID | Task | Description | Status |
+|----|------|-------------|--------|
+| P2-1 | **User Profile Page Redesign** | New profile page for both super admin and tenant users. Sections: account info, change password, account deletion (with confirmation workflow). | 🔴 Not Started |
+| P2-2 | **Branch Switcher** | UI component to switch between branches within a tenant (for multi-branch tenants) | 🔴 Not Started |
+| P2-3 | **Admin Impersonate** | Super admin can impersonate tenant users for support/debugging (with audit trail) | 🔴 Not Started |
+| P2-4 | **Notification System** | Real-time notifications (WebSocket/SSE), in-app bell + dropdown, notification preferences, email digests | 🔴 Not Started |
+| P2-5 | **Internationalization (i18n)** | Support English + Bahasa Indonesia. Use `next-intl` or `react-i18next`. Language switcher, backend error i18n keys. | 🔴 Not Started |
+
+---
+
+### P3 - Low Priority (Future Enhancements)
+
+| ID | Task | Description | Status |
+|----|------|-------------|--------|
+| P3-1 | **Prometheus Metrics** | Add `/metrics` endpoint for monitoring | 🔴 Not Started |
+| P3-2 | **Per-tenant Branding** | Custom colors/themes per tenant | 🔴 Not Started |
+| P3-3 | **Bulk User Invitations** | Invite multiple users at once via CSV or batch form | 🔴 Not Started |
+| P3-4 | **Custom Report Builder** | User-defined reports and scheduled email delivery | 🔴 Not Started |
+| P3-5 | **Trial Period Management** | Built-in trial period tracking and conversion flows | 🔴 Not Started |
+| P3-6 | **Frontend Unit Tests** | Jest + React Testing Library for components | 🔴 Not Started |
+| P3-7 | **Security Audit** | OWASP compliance, security scanners, penetration testing | 🔴 Not Started |
+| P3-8 | **Performance Optimization** | Query optimization, Redis caching, bundle analysis | 🔴 Not Started |
+
+---
+
+### Implementation Notes
+
+#### P1-1: User Architecture Redesign ✅ COMPLETE
+
+**Status**: All 118 backend tests passing. UI polish deferred.
+
+**Decision**: Approved architecture with two distinct scopes.
+
+| Scope | Roles | Description |
+|-------|-------|-------------|
+| **System** | `admin`, `operator` | SaaS platform management (tenant_id = NULL) |
+| **Tenant** | `owner`, `admin`, `member` | Customer business operations (tenant_id = UUID) |
+
+**Key Rules:**
+- 1 Tenant Owner per tenant (billing authority)
+- Tenant Owner deletion = account closure (hard delete all tenant data)
+- Tenant Admin/Member deletion = soft delete
+- System Operator = limited platform access (support role)
+
+**Detailed Plan**: [`docs/plans/P1-1-USER-ARCHITECTURE-REDESIGN.md`](plans/P1-1-USER-ARCHITECTURE-REDESIGN.md)
+
+**36 tasks across 5 phases:**
+1. Database Schema Migration (7 tasks)
+2. Backend Permission System (6 tasks)
+3. API Changes (7 tasks)
+4. Frontend UI Adjustments (10 tasks)
+5. Testing & Validation (6 tasks)
+
+#### P1-5: Payment Provider Interface
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  PaymentProvider (Interface)            │
+├─────────────────────────────────────────────────────────┤
+│ + create_payment(amount, metadata) → PaymentIntent      │
+│ + verify_payment(payment_id) → PaymentResult            │
+│ + refund_payment(payment_id, amount) → RefundResult     │
+│ + get_payment_methods() → List[PaymentMethod]           │
+│ + handle_webhook(payload) → WebhookResult               │
+└─────────────────────────────────────────────────────────┘
+          ▲              ▲              ▲
+          │              │              │
+   ┌──────┴──────┐ ┌─────┴─────┐ ┌──────┴──────┐
+   │StripeProvider│ │MidtransProvider│ │ManualProvider│
+   └─────────────┘ └───────────┘ └─────────────┘
+```
+
+**Files to create:**
+- `backend/app/services/payment_providers/base.py` - Abstract interface
+- `backend/app/services/payment_providers/stripe_provider.py`
+- `backend/app/services/payment_providers/midtrans_provider.py`
+- `backend/app/services/payment_providers/manual_provider.py` (current system)
+- `backend/app/services/payment_providers/factory.py` - Provider factory
+
+---
+
+## 6. Future Implementation Guide
 
 ### Infrastructure
 
@@ -375,7 +490,7 @@ Before this project can be considered a production-ready boilerplate:
 
 ---
 
-## 6. Session History
+## 7. Session History
 
 | # | Date | Focus | Outcome |
 |---|------|-------|---------|
@@ -397,5 +512,8 @@ Before this project can be considered a production-ready boilerplate:
 | 15 | 2026-02-12 | Payment UX & Invoice | Payment proof preview on tenant/admin pages, inline image viewing (no download), fullscreen lightbox, invoice dialog with print/PDF, billing transactions model, e-wallet payment type, tenant logo upload improvements |
 | 16 | 2026-02-13 | Billing System Enhancement | Revenue analytics (MRR/ARR/churn/ARPU, trends, CSV export), Usage metering (API tracking, quotas, alerts, middleware), Coupon system (discounts, redemptions, admin CRUD), 5 new models, 4 new services, 30+ new endpoints |
 | 17 | 2026-02-18 | Transaction Command Center | Unified billing transaction management, transaction detail page with approve/reject/coupon/discount/bonus actions, proration calculation fix for free-to-paid upgrades, bonus days applied on approval, subscription duration breakdown UX, payment proof preview with presigned URLs, invoice dialog with print/PDF |
+| 18 | 2026-02-19 | User Architecture Planning | Created prioritized roadmap (P0-P3), discussed and finalized user architecture redesign (System scope: admin/operator, Tenant scope: owner/admin/member), created detailed 36-task implementation plan across 5 phases |
+| 19 | 2026-02-20 | User Architecture Implementation | Implemented P1-1: Database migration (new role columns, data migration, constraints), backend permission system (SystemPermission/TenantPermission enums, new dependencies), API changes (auth/user endpoints, account closure, ownership transfer), frontend core (auth store, permission hooks, middleware) |
+| 20 | 2026-02-20 | User Architecture Testing | Fixed all 118 backend tests: updated test fixtures (conftest.py), updated assertions (staff→member, admin→owner), fixed TenantService.create_tenant to use TenantRole.OWNER, fixed backward compatibility role property for system admin (returns "super_admin") |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

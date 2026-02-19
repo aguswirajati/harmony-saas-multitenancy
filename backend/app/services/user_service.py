@@ -1,3 +1,13 @@
+"""
+User Service
+
+Handles user CRUD operations within tenant scope.
+
+User Architecture:
+- Tenant Owner: Primary account holder, billing authority (1 per tenant)
+- Tenant Admin: Delegated admin, no billing access
+- Tenant Member: Regular team member, business operations
+"""
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from fastapi import HTTPException, status, Request
@@ -6,7 +16,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 import secrets
 
-from app.models.user import User
+from app.models.user import User, TenantRole
 from app.models.branch import Branch
 from app.models.tenant import Tenant
 from app.core.security import get_password_hash, verify_password
@@ -14,6 +24,7 @@ from app.schemas.user import UserCreate, UserUpdate, UserChangePassword, UserWit
 from app.schemas.invitation import InviteUserRequest
 from app.services.audit_service import AuditService
 from app.models.audit_log import AuditAction, AuditStatus
+
 
 class UserService:
     def __init__(self, db: Session):
@@ -25,12 +36,13 @@ class UserService:
         skip: int = 0,
         limit: int = 100,
         search: Optional[str] = None,
-        role: Optional[str] = None,
+        tenant_role: Optional[str] = None,
         branch_id: Optional[UUID] = None
     ) -> Tuple[List[User], int]:
         """Get all users for tenant with filters"""
         query = self.db.query(User).filter(
-            User.tenant_id == tenant_id
+            User.tenant_id == tenant_id,
+            User.is_active == True
         ).options(joinedload(User.default_branch))
 
         # Search filter
@@ -42,9 +54,9 @@ class UserService:
                 (User.full_name.ilike(f"%{search}%"))
             )
 
-        # Role filter
-        if role:
-            query = query.filter(User.role == role)
+        # Role filter (using tenant_role)
+        if tenant_role:
+            query = query.filter(User.tenant_role == tenant_role)
 
         # Branch filter
         if branch_id:
@@ -77,7 +89,7 @@ class UserService:
         current_user: User,
         request: Request = None
     ) -> User:
-        """Create new user"""
+        """Create new tenant user (admin or member, not owner)"""
 
         # Check subscription status
         tenant = self.db.query(Tenant).filter(Tenant.id == tenant_id).first()
@@ -130,7 +142,9 @@ class UserService:
         elif user_data.first_name:
             full_name = user_data.first_name
 
-        # Create user
+        # Create user with tenant_role (not 'owner' - owner is created via registration only)
+        tenant_role = TenantRole(user_data.tenant_role) if user_data.tenant_role else TenantRole.MEMBER
+
         user = User(
             tenant_id=tenant_id,
             email=user_data.email,
@@ -139,9 +153,10 @@ class UserService:
             last_name=user_data.last_name,
             full_name=full_name,
             phone=user_data.phone,
-            role=user_data.role,
+            tenant_role=tenant_role,
+            business_role=user_data.business_role,
             default_branch_id=user_data.default_branch_id,
-            is_verified=True  # Auto-verify invited users
+            is_verified=True  # Auto-verify created users
         )
 
         self.db.add(user)
@@ -159,7 +174,8 @@ class UserService:
                 resource_id=user.id,
                 details={
                     "email": user.email,
-                    "role": user.role,
+                    "tenant_role": user.tenant_role.value if user.tenant_role else None,
+                    "business_role": user.business_role,
                     "created_by": current_user.email
                 },
                 status=AuditStatus.SUCCESS,
@@ -180,13 +196,28 @@ class UserService:
 
         user = self.get_user(user_id, tenant_id)
 
+        # Cannot change owner's tenant_role
+        if user.is_tenant_owner and user_data.tenant_role and user_data.tenant_role != "owner":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot change owner's role. Use ownership transfer instead."
+            )
+
+        # Cannot promote to owner (only via transfer)
+        if user_data.tenant_role == "owner":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot promote to owner. Use ownership transfer instead."
+            )
+
         # Prevent self-demotion from admin
-        if user.id == current_user.id and user_data.role and user_data.role != current_user.role:
-            if current_user.role in ["admin", "super_admin"]:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot change your own role"
-                )
+        if user.id == current_user.id and user_data.tenant_role:
+            if current_user.tenant_role in [TenantRole.OWNER, TenantRole.ADMIN]:
+                if user_data.tenant_role not in ["owner", "admin"]:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Cannot demote yourself"
+                    )
 
         # Verify branch if being changed
         if user_data.default_branch_id:
@@ -202,23 +233,24 @@ class UserService:
                 )
 
         # Track role change for audit
-        role_changed = user_data.role and user_data.role != user.role
+        role_changed = user_data.tenant_role and user_data.tenant_role != (user.tenant_role.value if user.tenant_role else None)
 
         # Update fields - use exclude_unset to only update provided fields
-        # exclude_none=False so that null values can clear fields
         update_data = user_data.model_dump(exclude_unset=True)
+
         for field, value in update_data.items():
-            setattr(user, field, value)
+            if field == "tenant_role" and value:
+                setattr(user, field, TenantRole(value))
+            else:
+                setattr(user, field, value)
 
         # Update full name based on current first/last name values
-        # Check if first_name or last_name was explicitly sent (even if null)
         first_name_sent = 'first_name' in update_data
         last_name_sent = 'last_name' in update_data
 
         if first_name_sent or last_name_sent:
-            # Use the new value if sent, otherwise keep existing
-            first = user.first_name  # Already updated by setattr above
-            last = user.last_name    # Already updated by setattr above
+            first = user.first_name
+            last = user.last_name
             if first and last:
                 user.full_name = f"{first} {last}"
             elif first:
@@ -247,7 +279,7 @@ class UserService:
                     "email": user.email,
                     "updated_fields": list(update_data.keys()),
                     "updated_by": current_user.email,
-                    "new_role": user.role if role_changed else None
+                    "new_tenant_role": user.tenant_role.value if role_changed and user.tenant_role else None
                 },
                 status=AuditStatus.SUCCESS,
                 request=request
@@ -262,7 +294,7 @@ class UserService:
         current_user: User,
         request: Request = None
     ) -> bool:
-        """Soft delete user"""
+        """Soft delete user (not allowed for owners)"""
 
         user = self.get_user(user_id, tenant_id)
 
@@ -273,16 +305,17 @@ class UserService:
                 detail="Cannot delete your own account"
             )
 
-        # Prevent deletion of super_admin
-        if user.role == "super_admin":
+        # Prevent deletion of tenant owner
+        if user.is_tenant_owner:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete super admin account"
+                detail="Cannot delete tenant owner. Use account closure instead."
             )
 
         # Soft delete
         user.is_active = False
         user.deleted_at = datetime.utcnow()
+        user.deleted_by_id = current_user.id
 
         self.db.commit()
 
@@ -297,7 +330,7 @@ class UserService:
                 resource_id=user.id,
                 details={
                     "email": user.email,
-                    "role": user.role,
+                    "tenant_role": user.tenant_role.value if user.tenant_role else None,
                     "deleted_by": current_user.email
                 },
                 status=AuditStatus.SUCCESS,
@@ -391,6 +424,17 @@ class UserService:
         elif invite_data.first_name:
             full_name = invite_data.first_name
 
+        # Determine tenant_role from invite data
+        tenant_role = TenantRole.MEMBER  # Default
+        if hasattr(invite_data, 'tenant_role') and invite_data.tenant_role:
+            tenant_role = TenantRole(invite_data.tenant_role)
+        elif hasattr(invite_data, 'role') and invite_data.role:
+            # Legacy: map old role to tenant_role
+            if invite_data.role == "admin":
+                tenant_role = TenantRole.ADMIN
+            else:
+                tenant_role = TenantRole.MEMBER
+
         user = User(
             tenant_id=tenant_id,
             email=invite_data.email,
@@ -398,7 +442,8 @@ class UserService:
             first_name=invite_data.first_name,
             last_name=invite_data.last_name,
             full_name=full_name,
-            role=invite_data.role,
+            tenant_role=tenant_role,
+            business_role=getattr(invite_data, 'business_role', None),
             default_branch_id=invite_data.default_branch_id,
             is_active=False,  # inactive until invitation accepted
             is_verified=False,
@@ -422,7 +467,7 @@ class UserService:
                 resource_id=user.id,
                 details={
                     "email": user.email,
-                    "role": user.role,
+                    "tenant_role": user.tenant_role.value if user.tenant_role else None,
                     "invited_by": current_user.email,
                 },
                 status=AuditStatus.SUCCESS,
@@ -470,3 +515,71 @@ class UserService:
         self.db.refresh(user)
 
         return user
+
+    def transfer_ownership(
+        self,
+        new_owner_id: UUID,
+        tenant_id: UUID,
+        current_user: User,
+        password: str,
+        request: Request = None
+    ) -> User:
+        """Transfer tenant ownership to another user"""
+
+        # Verify current user is owner
+        if not current_user.is_tenant_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the tenant owner can transfer ownership"
+            )
+
+        # Verify password
+        if not verify_password(password, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect password"
+            )
+
+        # Get new owner
+        new_owner = self.get_user(new_owner_id, tenant_id)
+
+        # Cannot transfer to self
+        if new_owner.id == current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot transfer ownership to yourself"
+            )
+
+        # Cannot transfer to inactive user
+        if not new_owner.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot transfer ownership to inactive user"
+            )
+
+        # Perform transfer
+        current_user.tenant_role = TenantRole.ADMIN  # Demote to admin
+        new_owner.tenant_role = TenantRole.OWNER  # Promote to owner
+
+        self.db.commit()
+        self.db.refresh(new_owner)
+
+        # Log ownership transfer
+        if request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                action=AuditAction.USER_ROLE_CHANGED,
+                resource="tenant",
+                resource_id=tenant_id,
+                details={
+                    "action": "ownership_transfer",
+                    "previous_owner": current_user.email,
+                    "new_owner": new_owner.email
+                },
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
+        return new_owner

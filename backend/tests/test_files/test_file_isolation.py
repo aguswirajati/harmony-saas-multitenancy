@@ -146,14 +146,14 @@ class TestFileIsolation:
         assert response.json() is None
 
 
-class TestSuperAdminFileAccess:
-    """Test super admin file access with X-Tenant-ID header."""
+class TestSystemAdminFileAccess:
+    """Test system admin file access with X-Tenant-ID header."""
 
-    def test_super_admin_can_access_tenant_files(
+    def test_system_admin_can_access_tenant_files(
         self, client, tenant_with_admin, super_admin, auth_headers, create_file
     ):
-        """Super admin can access tenant files via X-Tenant-ID header."""
-        tenant, _, admin = tenant_with_admin
+        """System admin can access tenant files via X-Tenant-ID header."""
+        tenant, _, owner = tenant_with_admin
 
         file = create_file(
             tenant_id=tenant.id,
@@ -172,11 +172,11 @@ class TestSuperAdminFileAccess:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["filename"] == "tenant_file.pdf"
 
-    def test_super_admin_can_list_tenant_files(
+    def test_system_admin_can_list_tenant_files(
         self, client, tenant_with_admin, super_admin, auth_headers, create_file
     ):
-        """Super admin can list tenant files via X-Tenant-ID header."""
-        tenant, _, admin = tenant_with_admin
+        """System admin can list tenant files via X-Tenant-ID header."""
+        tenant, _, owner = tenant_with_admin
 
         create_file(tenant_id=tenant.id, filename="file1.pdf")
         create_file(tenant_id=tenant.id, filename="file2.pdf")
@@ -193,19 +193,19 @@ class TestSuperAdminFileAccess:
         assert response.json()["total"] == 2
 
 
-class TestStaffPermissions:
-    """Test that staff users have appropriate file permissions."""
+class TestMemberPermissions:
+    """Test that member users have appropriate file permissions."""
 
-    def test_staff_can_view_files(
+    def test_member_can_view_files(
         self, client, tenant_with_admin, create_user, auth_headers, create_file
     ):
-        """Staff can view files in their tenant."""
-        tenant, hq, admin = tenant_with_admin
+        """Member can view files in their tenant."""
+        tenant, hq, owner = tenant_with_admin
 
-        staff = create_user(
+        member = create_user(
             tenant_id=tenant.id,
-            role="staff",
-            email="staff@test.com",
+            tenant_role="member",
+            email="member@test.com",
             default_branch_id=hq.id
         )
 
@@ -213,22 +213,22 @@ class TestStaffPermissions:
 
         response = client.get(
             "/api/v1/files",
-            headers=auth_headers(staff)
+            headers=auth_headers(member)
         )
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["total"] == 1
 
-    def test_staff_cannot_delete_files(
+    def test_member_cannot_delete_files(
         self, client, tenant_with_admin, create_user, auth_headers, create_file
     ):
-        """Staff cannot delete files (requires files.delete permission)."""
-        tenant, hq, admin = tenant_with_admin
+        """Member cannot delete files (requires files.delete permission)."""
+        tenant, hq, owner = tenant_with_admin
 
-        staff = create_user(
+        member = create_user(
             tenant_id=tenant.id,
-            role="staff",
-            email="staff@test.com",
+            tenant_role="member",
+            email="member@test.com",
             default_branch_id=hq.id
         )
 
@@ -236,7 +236,7 @@ class TestStaffPermissions:
 
         response = client.delete(
             f"/api/v1/files/{file.id}",
-            headers=auth_headers(staff)
+            headers=auth_headers(member)
         )
 
         assert response.status_code == status.HTTP_403_FORBIDDEN

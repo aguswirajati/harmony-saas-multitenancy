@@ -1,13 +1,18 @@
 """
-Fixed User Model - Support for Super Admin
+User Model - System and Tenant Scoped Users
 
-CRITICAL CHANGES:
-1. Made tenant_id nullable (allows NULL for super admin)
-2. Added is_super_admin field
-3. Made default_branch_id nullable (super admin has no branch)
+User Architecture:
+- System Users (tenant_id=NULL): Manage the SaaS platform
+  - system_role='admin': Full platform control
+  - system_role='operator': Limited platform access (support)
+
+- Tenant Users (tenant_id=UUID): Customer business operations
+  - tenant_role='owner': Primary account holder, billing authority (1 per tenant)
+  - tenant_role='admin': Delegated admin, no billing access
+  - tenant_role='member': Regular team member, business operations
 """
 
-from sqlalchemy import Column, String, Boolean, ForeignKey, JSON, DateTime
+from sqlalchemy import Column, String, Boolean, ForeignKey, JSON, DateTime, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -15,19 +20,31 @@ from app.core.database import Base
 from app.models.base import BaseModel
 from uuid import uuid4
 import uuid
+import enum
+
+
+class SystemRole(str, enum.Enum):
+    """Roles for system users (tenant_id=NULL)"""
+    ADMIN = "admin"
+    OPERATOR = "operator"
+
+
+class TenantRole(str, enum.Enum):
+    """Roles for tenant users (tenant_id=UUID)"""
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
 
 
 class User(Base, BaseModel):
     __tablename__ = "users"
 
-    # ========================================
-    # FIX: Make tenant_id nullable for super admin
-    # Super admin users have tenant_id=None
-    # ========================================
+    # Scope identifier
+    # NULL = System User, NOT NULL = Tenant User
     tenant_id = Column(
-        UUID(as_uuid=True), 
-        ForeignKey("tenants.id"), 
-        nullable=True  # ← Changed from nullable=False to nullable=True
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id"),
+        nullable=True
     )
 
     # Auth
@@ -43,25 +60,33 @@ class User(Base, BaseModel):
     avatar_url = Column(String)
 
     # Branch
-    # ========================================
-    # FIX: Make default_branch_id nullable
-    # Super admin has no default branch
-    # ========================================
     default_branch_id = Column(
-        UUID(as_uuid=True), 
+        UUID(as_uuid=True),
         ForeignKey("branches.id"),
-        nullable=True  # Already nullable, but confirming
+        nullable=True
     )
 
-    # Role & permissions
-    role = Column(String(50), default='staff')
-    permissions = Column(JSON, default=[])
+    # ========================================
+    # NEW: Scope-based role columns
+    # ========================================
 
-    # ========================================
-    # NEW: Add is_super_admin field
-    # Identifies system-wide super admin users
-    # ========================================
-    is_super_admin = Column(Boolean, default=False, nullable=False)
+    # System scope (when tenant_id IS NULL)
+    system_role = Column(
+        Enum(SystemRole, name='system_role_enum', create_type=False),
+        nullable=True
+    )
+
+    # Tenant scope (when tenant_id IS NOT NULL)
+    tenant_role = Column(
+        Enum(TenantRole, name='tenant_role_enum', create_type=False),
+        nullable=True
+    )
+
+    # Business scope (for tenant members with business features, e.g., ERP)
+    business_role = Column(String(50), nullable=True)
+
+    # Legacy permissions (kept for backward compatibility, may be removed)
+    permissions = Column(JSON, default=[])
 
     # Status
     is_verified = Column(Boolean, default=False)
@@ -85,6 +110,78 @@ class User(Base, BaseModel):
     tenant = relationship("Tenant", back_populates="users")
     default_branch = relationship("Branch", back_populates="users")
     branch_access = relationship("UserBranchAccess", back_populates="user")
+
+    # ========================================
+    # Helper properties
+    # ========================================
+
+    @property
+    def is_system_user(self) -> bool:
+        """Check if user is a system user (manages platform)"""
+        return self.tenant_id is None
+
+    @property
+    def is_tenant_user(self) -> bool:
+        """Check if user belongs to a tenant"""
+        return self.tenant_id is not None
+
+    @property
+    def is_system_admin(self) -> bool:
+        """Check if user is a system admin (full platform control)"""
+        return self.is_system_user and self.system_role == SystemRole.ADMIN
+
+    @property
+    def is_system_operator(self) -> bool:
+        """Check if user is a system operator (limited platform access)"""
+        return self.is_system_user and self.system_role == SystemRole.OPERATOR
+
+    @property
+    def is_tenant_owner(self) -> bool:
+        """Check if user is the tenant owner (billing authority)"""
+        return self.is_tenant_user and self.tenant_role == TenantRole.OWNER
+
+    @property
+    def is_tenant_admin(self) -> bool:
+        """Check if user is a tenant admin (delegated admin, no billing)"""
+        return self.is_tenant_user and self.tenant_role == TenantRole.ADMIN
+
+    @property
+    def is_tenant_member(self) -> bool:
+        """Check if user is a tenant member (business operations)"""
+        return self.is_tenant_user and self.tenant_role == TenantRole.MEMBER
+
+    @property
+    def can_manage_billing(self) -> bool:
+        """Check if user can manage tenant billing"""
+        return self.is_tenant_owner
+
+    @property
+    def can_delete_account(self) -> bool:
+        """Check if user can delete the tenant account"""
+        return self.is_tenant_owner
+
+    # ========================================
+    # Backward compatibility properties
+    # These map old role names to new structure
+    # TODO: Remove after full migration
+    # ========================================
+
+    @property
+    def role(self) -> str:
+        """Backward compatibility: Get role string"""
+        if self.is_system_user:
+            # Return "super_admin" for system admins to maintain backward compatibility
+            # with ROLE_PERMISSIONS mapping
+            if self.system_role == SystemRole.ADMIN:
+                return "super_admin"
+            return f"system_{self.system_role.value}" if self.system_role else "super_admin"
+        else:
+            return self.tenant_role.value if self.tenant_role else "member"
+
+    @property
+    def is_super_admin(self) -> bool:
+        """Backward compatibility: Check if super admin"""
+        return self.is_system_admin
 
 
 class UserBranchAccess(Base):

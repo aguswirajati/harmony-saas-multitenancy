@@ -1,10 +1,19 @@
+"""
+Authentication Service
+
+Handles user authentication, registration, password reset, and token management.
+
+User Architecture:
+- System Users (tenant_id=NULL): system_role = 'admin' | 'operator'
+- Tenant Users (tenant_id=UUID): tenant_role = 'owner' | 'admin' | 'member'
+"""
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status, Request
 from datetime import datetime, timedelta
 from uuid import UUID
 import secrets
 
-from app.models.user import User
+from app.models.user import User, TenantRole, SystemRole
 from app.models.tenant import Tenant
 from app.models.branch import Branch
 from app.core.security import (
@@ -28,9 +37,29 @@ from app.services.audit_service import AuditService
 from app.models.audit_log import AuditAction, AuditStatus
 from app.config import settings
 
+
 class AuthService:
     def __init__(self, db: Session):
         self.db = db
+
+    def _build_token_data(self, user: User) -> dict:
+        """Build token payload with role information"""
+        token_data = {
+            "sub": str(user.id),
+        }
+
+        if user.is_system_user:
+            # System user
+            token_data["system_role"] = user.system_role.value if user.system_role else None
+        else:
+            # Tenant user
+            token_data["tenant_id"] = str(user.tenant_id)
+            token_data["tenant_role"] = user.tenant_role.value if user.tenant_role else None
+
+        # Legacy field for backward compatibility
+        token_data["role"] = user.role
+
+        return token_data
 
     def login(self, login_data: LoginRequest, request: Request = None) -> LoginResponse:
         """Authenticate user and return tokens"""
@@ -79,13 +108,6 @@ class AuthService:
                 detail="Incorrect email or password"
             )
 
-        # ========================================
-        # FIX: Handle super admin (tenant_id=None)
-        # ========================================
-        
-        # Check if user is super admin (no tenant)
-        is_super_admin = user.tenant_id is None or user.role == "super_admin"
-        
         # Get tenant if not already fetched and user has tenant_id
         if not tenant and user.tenant_id:
             tenant = self.db.query(Tenant).filter(
@@ -106,23 +128,15 @@ class AuthService:
             resource_id=user.id,
             details={
                 "email": user.email,
-                "role": user.role,
-                "is_super_admin": user.is_super_admin
+                "system_role": user.system_role.value if user.system_role else None,
+                "tenant_role": user.tenant_role.value if user.tenant_role else None,
             },
             status=AuditStatus.SUCCESS,
             request=request
         )
 
-        # Create tokens with conditional tenant_id
-        token_data = {
-            "sub": str(user.id),
-            "role": user.role
-        }
-
-        # Only add tenant_id if user has a tenant
-        if tenant:
-            token_data["tenant_id"] = str(tenant.id)
-
+        # Create tokens
+        token_data = self._build_token_data(user)
         access_token = create_access_token(token_data)
         refresh_token = create_refresh_token(token_data)
 
@@ -137,8 +151,8 @@ class AuthService:
             }
 
         return LoginResponse(
-            user=UserResponse.from_orm(user),
-            tenant=tenant_data,  # Will be None for super admin
+            user=UserResponse.from_user(user),
+            tenant=tenant_data,  # Will be None for system users
             tokens=Token(
                 access_token=access_token,
                 refresh_token=refresh_token
@@ -165,7 +179,7 @@ class AuthService:
         return {"message": "Logged out successfully"}
 
     async def register(self, register_data: RegisterRequest, request: Request = None) -> RegisterResponse:
-        """Register new tenant with admin user"""
+        """Register new tenant with owner user"""
 
         # Check if subdomain already exists
         existing_tenant = self.db.query(Tenant).filter(
@@ -211,33 +225,33 @@ class AuthService:
             self.db.add(hq_branch)
             self.db.flush()  # Get branch.id
 
-            # Create admin user
+            # Create owner user (the person who registers becomes owner)
             name_parts = register_data.admin_name.split(' ', 1)
             first_name = name_parts[0]
             last_name = name_parts[1] if len(name_parts) > 1 else ""
 
-            admin_user = User(
+            owner_user = User(
                 tenant_id=tenant.id,
                 email=register_data.admin_email,
                 password_hash=get_password_hash(register_data.admin_password),
                 first_name=first_name,
                 last_name=last_name,
                 full_name=register_data.admin_name,
-                role="admin",
+                tenant_role=TenantRole.OWNER,  # New: tenant owner
                 default_branch_id=hq_branch.id,
-                is_verified=True,  # Auto-verify admin during registration
+                is_verified=True,  # Auto-verify owner during registration
                 email_verified_at=datetime.utcnow()
             )
-            self.db.add(admin_user)
+            self.db.add(owner_user)
             self.db.commit()
-            self.db.refresh(admin_user)
+            self.db.refresh(owner_user)
 
             # Log tenant creation and user registration
             if request:
                 # Log tenant creation
                 AuditService.log_action(
                     db=self.db,
-                    user_id=admin_user.id,
+                    user_id=owner_user.id,
                     tenant_id=tenant.id,
                     action=AuditAction.TENANT_CREATED,
                     resource="tenant",
@@ -254,14 +268,14 @@ class AuthService:
                 # Log user registration
                 AuditService.log_action(
                     db=self.db,
-                    user_id=admin_user.id,
+                    user_id=owner_user.id,
                     tenant_id=tenant.id,
                     action=AuditAction.USER_CREATED,
                     resource="user",
-                    resource_id=admin_user.id,
+                    resource_id=owner_user.id,
                     details={
-                        "email": admin_user.email,
-                        "role": admin_user.role,
+                        "email": owner_user.email,
+                        "tenant_role": "owner",
                         "via": "registration"
                     },
                     status=AuditStatus.SUCCESS,
@@ -271,8 +285,8 @@ class AuthService:
             # Send welcome email (don't fail registration if email fails)
             try:
                 await email_service.send_welcome_email(
-                    to_email=admin_user.email,
-                    user_name=admin_user.full_name,
+                    to_email=owner_user.email,
+                    user_name=owner_user.full_name,
                     tenant_name=tenant.name,
                     verification_url=None  # Already verified
                 )
@@ -282,12 +296,7 @@ class AuthService:
                 logger.error(f"Failed to send welcome email: {str(e)}")
 
             # Create tokens
-            token_data = {
-                "sub": str(admin_user.id),
-                "tenant_id": str(tenant.id),
-                "role": admin_user.role
-            }
-
+            token_data = self._build_token_data(owner_user)
             access_token = create_access_token(token_data)
             refresh_token = create_refresh_token(token_data)
 
@@ -299,7 +308,7 @@ class AuthService:
                     "subdomain": tenant.subdomain,
                     "tier": tenant.tier
                 },
-                user=UserResponse.from_orm(admin_user),
+                user=UserResponse.from_user(owner_user),
                 tokens=Token(
                     access_token=access_token,
                     refresh_token=refresh_token
@@ -313,12 +322,12 @@ class AuthService:
                 detail=f"Registration failed: {str(e)}"
             )
 
-    async def forgot_password(self, request: ForgotPasswordRequest) -> ForgotPasswordResponse:
+    async def forgot_password(self, request_data: ForgotPasswordRequest, request: Request = None) -> ForgotPasswordResponse:
         """Generate password reset token and send email"""
 
         # Find user by email
         user = self.db.query(User).filter(
-            User.email == request.email,
+            User.email == request_data.email,
             User.is_active == True
         ).first()
 
@@ -346,7 +355,8 @@ class AuthService:
             resource="user",
             resource_id=user.id,
             details={"email": user.email},
-            status=AuditStatus.SUCCESS
+            status=AuditStatus.SUCCESS,
+            request=request
         )
 
         # Send password reset email
@@ -500,15 +510,7 @@ class AuthService:
                 )
 
             # Create new tokens
-            token_data = {
-                "sub": str(user.id),
-                "role": user.role
-            }
-
-            # Add tenant_id if user has one
-            if user.tenant_id:
-                token_data["tenant_id"] = str(user.tenant_id)
-
+            token_data = self._build_token_data(user)
             new_access_token = create_access_token(token_data)
             new_refresh_token = create_refresh_token(token_data)
 
@@ -523,3 +525,94 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired refresh token"
             )
+
+    async def accept_invite(
+        self,
+        token: str,
+        password: str,
+        first_name: str = None,
+        last_name: str = None,
+        request: Request = None
+    ) -> LoginResponse:
+        """Accept an invitation and set password"""
+
+        # Find user with matching invitation token
+        user = self.db.query(User).filter(
+            User.invitation_token == token,
+            User.is_active == True
+        ).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid invitation token"
+            )
+
+        # Check if token has expired
+        if user.invitation_expires_at and user.invitation_expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation has expired. Please request a new one."
+            )
+
+        # Update user
+        user.password_hash = get_password_hash(password)
+        user.invitation_token = None
+        user.invitation_expires_at = None
+        user.is_verified = True
+        user.email_verified_at = datetime.utcnow()
+
+        if first_name:
+            user.first_name = first_name
+        if last_name:
+            user.last_name = last_name
+        if first_name or last_name:
+            user.full_name = f"{first_name or ''} {last_name or ''}".strip()
+
+        self.db.commit()
+        self.db.refresh(user)
+
+        # Log invite acceptance
+        if request:
+            AuditService.log_action(
+                db=self.db,
+                user_id=user.id,
+                tenant_id=user.tenant_id,
+                action=AuditAction.USER_UPDATED,
+                resource="user",
+                resource_id=user.id,
+                details={
+                    "email": user.email,
+                    "action": "invitation_accepted"
+                },
+                status=AuditStatus.SUCCESS,
+                request=request
+            )
+
+        # Get tenant
+        tenant = None
+        if user.tenant_id:
+            tenant = self.db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+
+        # Create tokens and return login response
+        token_data = self._build_token_data(user)
+        access_token = create_access_token(token_data)
+        refresh_token = create_refresh_token(token_data)
+
+        tenant_data = None
+        if tenant:
+            tenant_data = {
+                "id": str(tenant.id),
+                "name": tenant.name,
+                "subdomain": tenant.subdomain,
+                "tier": tenant.tier
+            }
+
+        return LoginResponse(
+            user=UserResponse.from_user(user),
+            tenant=tenant_data,
+            tokens=Token(
+                access_token=access_token,
+                refresh_token=refresh_token
+            )
+        )

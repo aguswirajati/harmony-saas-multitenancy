@@ -3,6 +3,10 @@ Core test fixtures for Harmony SaaS backend testing.
 
 Uses PostgreSQL test database with transaction rollback per test for isolation and speed.
 Set TEST_DATABASE_URL env var or defaults to postgresql://postgres:postgres@localhost:5432/harmony_test
+
+User Architecture:
+- System Users (tenant_id=None): system_role = 'admin' | 'operator'
+- Tenant Users (tenant_id=UUID): tenant_role = 'owner' | 'admin' | 'member'
 """
 import os
 import uuid
@@ -30,7 +34,7 @@ from app.core.database import Base, get_db
 from app.core.security import create_access_token, get_password_hash
 from app.models.tenant import Tenant
 from app.models.branch import Branch
-from app.models.user import User
+from app.models.user import User, SystemRole, TenantRole
 from app.main import app
 
 
@@ -178,19 +182,35 @@ def create_branch(db_session):
 
 @pytest.fixture()
 def create_user(db_session):
-    """Factory fixture to create a user."""
+    """
+    Factory fixture to create a user.
+
+    For system users (tenant_id=None): use system_role='admin' or 'operator'
+    For tenant users (tenant_id=UUID): use tenant_role='owner', 'admin', or 'member'
+    """
     def _create(
         tenant_id: uuid.UUID | None = None,
         email: str | None = None,
         password: str = "Test1234",
-        role: str = "staff",
+        system_role: str | None = None,  # For system users: 'admin' or 'operator'
+        tenant_role: str | None = None,  # For tenant users: 'owner', 'admin', 'member'
+        business_role: str | None = None,
         first_name: str = "Test",
         last_name: str = "User",
-        is_super_admin: bool = False,
         default_branch_id: uuid.UUID | None = None,
         is_active: bool = True,
         is_verified: bool = True,
     ) -> User:
+        # Determine roles based on tenant_id
+        if tenant_id is None:
+            # System user
+            sys_role = SystemRole(system_role) if system_role else SystemRole.ADMIN
+            ten_role = None
+        else:
+            # Tenant user
+            sys_role = None
+            ten_role = TenantRole(tenant_role) if tenant_role else TenantRole.MEMBER
+
         user = User(
             tenant_id=tenant_id,
             email=email or f"user-{uuid.uuid4().hex[:8]}@test.com",
@@ -198,8 +218,9 @@ def create_user(db_session):
             first_name=first_name,
             last_name=last_name,
             full_name=f"{first_name} {last_name}",
-            role=role,
-            is_super_admin=is_super_admin,
+            system_role=sys_role,
+            tenant_role=ten_role,
+            business_role=business_role,
             default_branch_id=default_branch_id,
             is_active=is_active,
             is_verified=is_verified,
@@ -216,12 +237,58 @@ def create_user(db_session):
 
 @pytest.fixture()
 def tenant_with_admin(create_tenant, create_branch, create_user):
-    """Create a tenant with HQ branch and admin user. Returns (tenant, branch, admin)."""
+    """Create a tenant with HQ branch and owner user. Returns (tenant, branch, owner)."""
     tenant = create_tenant()
     hq = create_branch(tenant_id=tenant.id, name="Head Office", code="HQ", is_hq=True)
+    owner = create_user(
+        tenant_id=tenant.id,
+        tenant_role="owner",
+        email=f"owner-{uuid.uuid4().hex[:8]}@test.com",
+        default_branch_id=hq.id,
+    )
+    return tenant, hq, owner
+
+
+@pytest.fixture()
+def super_admin(create_user):
+    """Create a system admin user (no tenant)."""
+    return create_user(
+        tenant_id=None,
+        system_role="admin",
+        email=f"sysadmin-{uuid.uuid4().hex[:8]}@test.com",
+        first_name="System",
+        last_name="Admin",
+    )
+
+
+@pytest.fixture()
+def system_operator(create_user):
+    """Create a system operator user (limited platform access)."""
+    return create_user(
+        tenant_id=None,
+        system_role="operator",
+        email=f"sysoperator-{uuid.uuid4().hex[:8]}@test.com",
+        first_name="System",
+        last_name="Operator",
+    )
+
+
+@pytest.fixture()
+def tenant_admin(create_tenant, create_branch, create_user):
+    """Create a tenant with admin (not owner). Returns (tenant, branch, admin)."""
+    tenant = create_tenant()
+    hq = create_branch(tenant_id=tenant.id, name="Head Office", code="HQ", is_hq=True)
+    # First create owner
+    create_user(
+        tenant_id=tenant.id,
+        tenant_role="owner",
+        email=f"owner-{uuid.uuid4().hex[:8]}@test.com",
+        default_branch_id=hq.id,
+    )
+    # Then create admin
     admin = create_user(
         tenant_id=tenant.id,
-        role="admin",
+        tenant_role="admin",
         email=f"admin-{uuid.uuid4().hex[:8]}@test.com",
         default_branch_id=hq.id,
     )
@@ -229,39 +296,48 @@ def tenant_with_admin(create_tenant, create_branch, create_user):
 
 
 @pytest.fixture()
-def super_admin(create_user):
-    """Create a super admin user (no tenant)."""
-    return create_user(
-        tenant_id=None,
-        role="super_admin",
-        is_super_admin=True,
-        email=f"superadmin-{uuid.uuid4().hex[:8]}@test.com",
-        first_name="Super",
-        last_name="Admin",
+def tenant_member(create_tenant, create_branch, create_user):
+    """Create a tenant with member (staff). Returns (tenant, branch, member)."""
+    tenant = create_tenant()
+    hq = create_branch(tenant_id=tenant.id, name="Head Office", code="HQ", is_hq=True)
+    # First create owner
+    create_user(
+        tenant_id=tenant.id,
+        tenant_role="owner",
+        email=f"owner-{uuid.uuid4().hex[:8]}@test.com",
+        default_branch_id=hq.id,
     )
+    # Then create member
+    member = create_user(
+        tenant_id=tenant.id,
+        tenant_role="member",
+        email=f"member-{uuid.uuid4().hex[:8]}@test.com",
+        default_branch_id=hq.id,
+    )
+    return tenant, hq, member
 
 
 @pytest.fixture()
 def two_tenants(create_tenant, create_branch, create_user):
     """
-    Create two separate tenants, each with HQ + admin.
-    Returns (tenant_a, admin_a, tenant_b, admin_b).
+    Create two separate tenants, each with HQ + owner.
+    Returns (tenant_a, owner_a, tenant_b, owner_b).
     """
     tenant_a = create_tenant(name="Tenant A", subdomain="tenant-a")
     hq_a = create_branch(tenant_id=tenant_a.id, name="HQ A", code="HQ", is_hq=True)
-    admin_a = create_user(
-        tenant_id=tenant_a.id, role="admin",
-        email="admin-a@test.com", default_branch_id=hq_a.id,
+    owner_a = create_user(
+        tenant_id=tenant_a.id, tenant_role="owner",
+        email="owner-a@test.com", default_branch_id=hq_a.id,
     )
 
     tenant_b = create_tenant(name="Tenant B", subdomain="tenant-b")
     hq_b = create_branch(tenant_id=tenant_b.id, name="HQ B", code="HQ", is_hq=True)
-    admin_b = create_user(
-        tenant_id=tenant_b.id, role="admin",
-        email="admin-b@test.com", default_branch_id=hq_b.id,
+    owner_b = create_user(
+        tenant_id=tenant_b.id, tenant_role="owner",
+        email="owner-b@test.com", default_branch_id=hq_b.id,
     )
 
-    return tenant_a, admin_a, tenant_b, admin_b
+    return tenant_a, owner_a, tenant_b, owner_b
 
 
 # ---------------------------------------------------------------------------
@@ -274,10 +350,15 @@ def auth_headers():
     def _headers(user: User) -> dict:
         token_data = {
             "sub": str(user.id),
-            "role": user.role,
+            "role": user.role,  # Uses computed property for backward compatibility
         }
-        if user.tenant_id:
+        # Add scope-specific role info
+        if user.is_system_user:
+            token_data["system_role"] = user.system_role.value if user.system_role else None
+        else:
             token_data["tenant_id"] = str(user.tenant_id)
+            token_data["tenant_role"] = user.tenant_role.value if user.tenant_role else None
+
         token = create_access_token(token_data)
         return {"Authorization": f"Bearer {token}"}
     return _headers

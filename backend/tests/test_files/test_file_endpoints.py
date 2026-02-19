@@ -354,35 +354,35 @@ class TestUserAvatarEndpoints:
         assert data["filename"] == "avatar.jpg"
         assert data["category"] == "user_avatar"
 
-    def test_staff_can_get_own_avatar(
+    def test_member_can_get_own_avatar(
         self, client, tenant_with_admin, create_user, auth_headers, create_file
     ):
-        """Staff can access their own avatar."""
-        tenant, hq, admin = tenant_with_admin
+        """Member can access their own avatar."""
+        tenant, hq, owner = tenant_with_admin
 
-        staff = create_user(
+        member = create_user(
             tenant_id=tenant.id,
-            role="staff",
+            tenant_role="member",
             default_branch_id=hq.id
         )
 
         create_file(
             tenant_id=tenant.id,
-            filename="staff_avatar.jpg",
+            filename="member_avatar.jpg",
             category="user_avatar",
             content_type="image/jpeg",
             resource_type="user",
-            resource_id=staff.id
+            resource_id=member.id
         )
 
         response = client.get(
-            f"/api/v1/files/users/{staff.id}/avatar",
-            headers=auth_headers(staff)
+            f"/api/v1/files/users/{member.id}/avatar",
+            headers=auth_headers(member)
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["filename"] == "staff_avatar.jpg"
+        assert data["filename"] == "member_avatar.jpg"
 
     def test_delete_own_avatar(
         self, client, tenant_with_admin, auth_headers, create_file

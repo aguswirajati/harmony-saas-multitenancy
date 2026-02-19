@@ -85,7 +85,7 @@ async def get_current_user_info(
 
     Requires: Bearer token in Authorization header
     """
-    return UserResponse.from_orm(current_user)
+    return UserResponse.from_user(current_user)
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(
@@ -161,6 +161,7 @@ async def refresh_token(
 @router.post("/accept-invite", response_model=AcceptInviteResponse)
 async def accept_invite(
     invite_data: AcceptInviteRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
@@ -169,34 +170,26 @@ async def accept_invite(
     Sets the user's password and activates their account.
     Returns authentication tokens so the user is logged in immediately.
     """
-    user_service = UserService(db)
-    user = user_service.accept_invite(
+    auth_service = AuthService(db)
+    login_response = await auth_service.accept_invite(
         token=invite_data.token,
         password=invite_data.password,
         first_name=invite_data.first_name,
         last_name=invite_data.last_name,
+        request=request
     )
-
-    # Generate tokens
-    token_data = {
-        "sub": str(user.id),
-        "role": user.role,
-        "tenant_id": str(user.tenant_id) if user.tenant_id else None,
-    }
-    access_token = create_access_token(token_data)
-    refresh_token_val = create_refresh_token(token_data)
 
     return AcceptInviteResponse(
         message="Invitation accepted successfully",
         user={
-            "id": str(user.id),
-            "email": user.email,
-            "full_name": user.full_name,
-            "role": user.role,
+            "id": str(login_response.user.id),
+            "email": login_response.user.email,
+            "full_name": login_response.user.full_name,
+            "tenant_role": login_response.user.tenant_role,
         },
         tokens={
-            "access_token": access_token,
-            "refresh_token": refresh_token_val,
+            "access_token": login_response.tokens.access_token,
+            "refresh_token": login_response.tokens.refresh_token,
             "token_type": "bearer",
         },
     )

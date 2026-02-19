@@ -10,33 +10,33 @@ from app.schemas.user import UserCreate, UserUpdate, UserChangePassword
 class TestUserCRUD:
 
     def test_create_user(self, db_session, tenant_with_admin):
-        tenant, hq, admin = tenant_with_admin
+        tenant, hq, owner = tenant_with_admin
         svc = UserService(db_session)
         data = UserCreate(
             email="newuser@test.com",
             password="Test1234",
-            role="staff",
+            tenant_role="member",
             first_name="New",
             last_name="User",
             default_branch_id=hq.id,
         )
-        user = svc.create_user(data, tenant.id, admin)
+        user = svc.create_user(data, tenant.id, owner)
         assert user.email == "newuser@test.com"
-        assert user.role == "staff"
+        assert user.tenant_role.value == "member"
         assert user.tenant_id == tenant.id
 
     def test_create_user_duplicate_email_rejected(
         self, db_session, tenant_with_admin,
     ):
-        tenant, hq, admin = tenant_with_admin
+        tenant, hq, owner = tenant_with_admin
         svc = UserService(db_session)
         data = UserCreate(
-            email=admin.email,  # Already exists
+            email=owner.email,  # Already exists
             password="Test1234",
-            role="staff",
+            tenant_role="member",
         )
         with pytest.raises(HTTPException) as exc_info:
-            svc.create_user(data, tenant.id, admin)
+            svc.create_user(data, tenant.id, owner)
         assert exc_info.value.status_code == 400
 
     def test_get_user(self, db_session, tenant_with_admin, create_user):
@@ -101,21 +101,21 @@ class TestUserTierLimits:
     ):
         tenant = create_tenant(max_users=2)
         hq = create_branch(tenant_id=tenant.id, is_hq=True)
-        admin = create_user(
-            tenant_id=tenant.id, role="admin",
-            email="limadmin@test.com", default_branch_id=hq.id,
+        owner = create_user(
+            tenant_id=tenant.id, tenant_role="owner",
+            email="limowner@test.com", default_branch_id=hq.id,
         )
-        # Create one more to hit the limit (admin is already 1)
+        # Create one more to hit the limit (owner is already 1)
         create_user(tenant_id=tenant.id, email="second@test.com")
 
         svc = UserService(db_session)
         data = UserCreate(
             email="overflow@test.com",
             password="Test1234",
-            role="staff",
+            tenant_role="member",
         )
         with pytest.raises(HTTPException) as exc_info:
-            svc.create_user(data, tenant.id, admin)
+            svc.create_user(data, tenant.id, owner)
         assert exc_info.value.status_code == 403
         assert "limit" in exc_info.value.detail.lower()
 

@@ -1,3 +1,10 @@
+/**
+ * Next.js Middleware for Route Protection
+ *
+ * User Architecture:
+ * - System Users (tenant_id=null): Routed to /admin/*
+ * - Tenant Users (tenant_id=UUID): Routed to /dashboard/*
+ */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -21,13 +28,16 @@ export function middleware(request: NextRequest) {
   try {
     const user = JSON.parse(decodeURIComponent(userCookie));
 
-    // Super Admin routing
-    if (user.role === 'super_admin') {
+    // Determine if user is a system user (tenant_id is null or missing)
+    const isSystemUser = user.tenant_id === null || user.tenant_id === undefined;
+
+    // System User routing (platform management)
+    if (isSystemUser) {
       if (!pathname.startsWith('/admin')) {
         return NextResponse.redirect(new URL('/admin', request.url));
       }
     } else {
-      // Regular users blocked from /admin
+      // Tenant User routing (business operations)
       if (pathname.startsWith('/admin')) {
         return NextResponse.redirect(new URL('/dashboard', request.url));
       }

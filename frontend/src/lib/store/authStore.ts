@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { authAPI } from '@/lib/api/auth';
-import { User, Tenant, LoginRequest, RegisterRequest } from '@/types/auth';
+import { User, Tenant, LoginRequest, RegisterRequest, isSystemUser } from '@/types/auth';
 
 interface AuthState {
   user: User | null;
@@ -131,8 +131,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     const user = authAPI.getStoredUser();
     const tenant = authAPI.getStoredTenant();
 
-    // Super admins don't need tenant to authenticate
-    if (user && (user.role === 'super_admin' || tenant)) {
+    // System users (tenant_id=null) don't need tenant to authenticate
+    // Tenant users require a tenant
+    if (user && (isSystemUser(user) || tenant)) {
       set({
         user,
         tenant,

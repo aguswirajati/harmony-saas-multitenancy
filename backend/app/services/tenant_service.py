@@ -11,7 +11,7 @@ import logging
 from fastapi import Request
 
 from app.models.tenant import Tenant
-from app.models.user import User
+from app.models.user import User, TenantRole
 from app.models.branch import Branch
 from app.schemas.tenant import (
     TenantCreate, TenantUpdate, TenantSubscriptionUpdate,
@@ -169,7 +169,7 @@ class TenantService:
             self.db.add(hq_branch)
             self.db.flush()  # Get branch ID
 
-            # Create admin user
+            # Create owner user (tenant owner with full access)
             admin_user = User(
                 tenant_id=tenant.id,
                 default_branch_id=hq_branch.id,
@@ -178,7 +178,7 @@ class TenantService:
                 first_name=tenant_data.admin_first_name,
                 last_name=tenant_data.admin_last_name,
                 full_name=f"{tenant_data.admin_first_name} {tenant_data.admin_last_name}",
-                role="admin",
+                tenant_role=TenantRole.OWNER,
                 is_verified=True,
                 permissions=[]
             )
@@ -430,7 +430,34 @@ class TenantService:
 
         logger.info(f"Deleted tenant: {tenant.subdomain}")
         return True
-    
+
+    def hard_delete_tenant(self, tenant_id: UUID) -> bool:
+        """
+        Permanently delete tenant and all associated data.
+
+        This is used for account closure by tenant owner.
+        All related data (users, branches, files, etc.) will be deleted
+        via cascade rules in the database.
+
+        WARNING: This action is irreversible!
+        """
+        tenant = self.get_tenant_by_id(tenant_id)
+        tenant_name = tenant.name
+        subdomain = tenant.subdomain
+
+        # Delete all users first (to avoid FK issues)
+        self.db.query(User).filter(User.tenant_id == tenant_id).delete()
+
+        # Delete all branches
+        self.db.query(Branch).filter(Branch.tenant_id == tenant_id).delete()
+
+        # Delete the tenant
+        self.db.delete(tenant)
+        self.db.commit()
+
+        logger.warning(f"HARD DELETED tenant: {subdomain} (name: {tenant_name})")
+        return True
+
     # ========================================================================
     # STATISTICS & ANALYTICS
     # ========================================================================

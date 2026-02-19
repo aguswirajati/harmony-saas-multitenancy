@@ -33,9 +33,17 @@ What's built:
 - Docker setup (Dockerfiles + docker-compose for local dev)
 - CI/CD (GitHub Actions for backend lint/test, frontend lint/build/e2e)
 
-What's NOT built yet (Phase 3+): notifications, i18n, online payment integration (Stripe/Midtrans).
+**Pending Tasks (Phase 3+):**
+- P0: Fix forgot password page (broken)
+- P1: User architecture redesign (system admin vs tenant owner vs tenant team)
+- P1: Layout redesign (top nav, user dropdown, notification bell)
+- P1: Simplify registration (remove subdomain/company fields)
+- P1: Payment provider interface (Strategy Pattern for Stripe/Midtrans/manual)
+- P2: User profile page redesign (change password, account deletion)
+- P2: Branch switcher, Admin impersonate
+- P2: Notification system, i18n
 
-For full status details, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
+For full status and prioritized roadmap, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
 
 ## Project Overview
 

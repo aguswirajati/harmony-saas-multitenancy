@@ -2,78 +2,78 @@
 import pytest
 
 
-class TestStaffCannotAccessAdminEndpoints:
-    """Staff users should be blocked from admin-only endpoints."""
+class TestMemberCannotAccessAdminEndpoints:
+    """Member users should be blocked from admin-only endpoints."""
 
-    def test_staff_cannot_create_user(
+    def test_member_cannot_create_user(
         self, client, tenant_with_admin, create_user, auth_headers,
     ):
-        tenant, hq, admin = tenant_with_admin
-        staff = create_user(
-            tenant_id=tenant.id, role="staff",
-            email="staff@test.com", default_branch_id=hq.id,
+        tenant, hq, owner = tenant_with_admin
+        member = create_user(
+            tenant_id=tenant.id, tenant_role="member",
+            email="member@test.com", default_branch_id=hq.id,
         )
         resp = client.post(
             "/api/v1/users",
-            headers=auth_headers(staff),
+            headers=auth_headers(member),
             json={
                 "email": "newuser@test.com",
                 "password": "Test1234",
-                "role": "staff",
+                "tenant_role": "member",
             },
         )
         assert resp.status_code == 403
 
-    def test_staff_cannot_delete_user(
+    def test_member_cannot_delete_user(
         self, client, tenant_with_admin, create_user, auth_headers,
     ):
-        tenant, hq, admin = tenant_with_admin
-        staff = create_user(
-            tenant_id=tenant.id, role="staff",
-            email="staff2@test.com", default_branch_id=hq.id,
+        tenant, hq, owner = tenant_with_admin
+        member = create_user(
+            tenant_id=tenant.id, tenant_role="member",
+            email="member2@test.com", default_branch_id=hq.id,
         )
         resp = client.delete(
-            f"/api/v1/users/{admin.id}",
-            headers=auth_headers(staff),
+            f"/api/v1/users/{owner.id}",
+            headers=auth_headers(member),
         )
         assert resp.status_code == 403
 
-    def test_staff_cannot_create_branch(
+    def test_member_cannot_create_branch(
         self, client, tenant_with_admin, create_user, auth_headers,
     ):
-        tenant, hq, admin = tenant_with_admin
-        staff = create_user(
-            tenant_id=tenant.id, role="staff",
-            email="staff3@test.com", default_branch_id=hq.id,
+        tenant, hq, owner = tenant_with_admin
+        member = create_user(
+            tenant_id=tenant.id, tenant_role="member",
+            email="member3@test.com", default_branch_id=hq.id,
         )
         resp = client.post(
             "/api/v1/branches",
-            headers=auth_headers(staff),
+            headers=auth_headers(member),
             json={"name": "New Branch", "code": "NB1"},
         )
         assert resp.status_code == 403
 
 
-class TestTenantAdminCannotAccessSuperAdminEndpoints:
-    """Tenant admins should be blocked from super admin endpoints."""
+class TestTenantOwnerCannotAccessSystemAdminEndpoints:
+    """Tenant owners should be blocked from system admin endpoints."""
 
-    def test_tenant_admin_cannot_access_admin_stats(
+    def test_tenant_owner_cannot_access_admin_stats(
         self, client, tenant_with_admin, auth_headers,
     ):
-        _, _, admin = tenant_with_admin
+        _, _, owner = tenant_with_admin
         resp = client.get(
             "/api/v1/admin/stats",
-            headers=auth_headers(admin),
+            headers=auth_headers(owner),
         )
         assert resp.status_code == 403
 
-    def test_tenant_admin_cannot_list_all_users(
+    def test_tenant_owner_cannot_list_all_users(
         self, client, tenant_with_admin, auth_headers,
     ):
-        _, _, admin = tenant_with_admin
+        _, _, owner = tenant_with_admin
         resp = client.get(
             "/api/v1/admin/users",
-            headers=auth_headers(admin),
+            headers=auth_headers(owner),
         )
         assert resp.status_code == 403
 

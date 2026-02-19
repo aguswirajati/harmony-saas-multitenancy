@@ -1,12 +1,23 @@
 """
-Tenant Settings Endpoints for Phase 6A
-Tenant self-service operations (non-super admin)
+Tenant Settings Endpoints
+
+Tenant self-service operations for:
+- Viewing tenant info and subscription
+- Updating settings and format preferences
+- Checking limits and features
+- Account closure (owner only)
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.api.deps import get_current_tenant, verify_tenant_admin, get_current_active_user
+from app.api.deps import (
+    get_current_tenant,
+    get_tenant_admin_or_owner,
+    get_tenant_owner,
+    require_tenant_permission,
+)
+from app.core.permissions import TenantPermission
 from app.models.user import User
 from app.models.tenant import Tenant
 from app.services.tenant_service import TenantService
@@ -16,6 +27,7 @@ from app.schemas.tenant import (
     AvailableTiers, FormatSettings
 )
 from app.schemas.payment import SubscriptionInfo
+from app.schemas.user import AccountClosureRequest
 
 router = APIRouter(prefix="/tenant-settings", tags=["Tenant Settings"])
 
@@ -60,7 +72,7 @@ def cancel_scheduled_downgrade(
     request: Request,
     db: Session = Depends(get_db),
     current_tenant: Tenant = Depends(get_current_tenant),
-    current_user: User = Depends(verify_tenant_admin)
+    current_user: User = Depends(get_tenant_admin_or_owner)
 ):
     """
     Cancel a scheduled downgrade
@@ -127,7 +139,7 @@ def update_tenant_settings(
     settings_data: TenantSettingsUpdate,
     db: Session = Depends(get_db),
     current_tenant: Tenant = Depends(get_current_tenant),
-    current_user: User = Depends(verify_tenant_admin)
+    current_user: User = Depends(require_tenant_permission(TenantPermission.SETTINGS_EDIT))
 ):
     """
     Update tenant settings (self-service)
@@ -177,7 +189,7 @@ def update_format_settings(
     format_data: FormatSettings,
     db: Session = Depends(get_db),
     current_tenant: Tenant = Depends(get_current_tenant),
-    current_user: User = Depends(verify_tenant_admin)
+    current_user: User = Depends(require_tenant_permission(TenantPermission.SETTINGS_EDIT))
 ):
     """
     Update format settings for the tenant
@@ -261,17 +273,85 @@ def check_feature_access(
 ):
     """
     Check if tenant has access to a specific feature
-    
+
     **Available to all authenticated users**
-    
+
     Returns:
     - feature_name: str
     - enabled: boolean
     """
     service = TenantService(db)
     enabled = service.validate_feature_access(current_tenant.id, feature_name)
-    
+
     return {
         "feature_name": feature_name,
         "enabled": enabled
+    }
+
+
+# ============================================================================
+# ACCOUNT MANAGEMENT (Owner Only)
+# ============================================================================
+
+@router.delete("/account", status_code=status.HTTP_200_OK)
+def close_account(
+    closure_request: AccountClosureRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_tenant: Tenant = Depends(get_current_tenant),
+    current_user: User = Depends(get_tenant_owner)
+):
+    """
+    Permanently close tenant account and delete all data (Owner only)
+
+    **DANGER: This action is irreversible!**
+
+    Requirements:
+    - User must be the tenant owner
+    - Must confirm by typing "DELETE MY ACCOUNT"
+    - Must provide current password
+
+    This will:
+    - Hard delete all tenant data (users, branches, files, etc.)
+    - Cancel any active subscriptions
+    - Remove the tenant record
+
+    Returns confirmation of deletion.
+    """
+    from app.core.security import verify_password
+    from app.services.audit_service import AuditService
+    from app.models.audit_log import AuditAction, AuditStatus
+
+    # Verify password
+    if not verify_password(closure_request.password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect password"
+        )
+
+    # Log the account closure before deletion
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        tenant_id=current_tenant.id,
+        action=AuditAction.TENANT_DELETED,
+        resource="tenant",
+        resource_id=current_tenant.id,
+        details={
+            "tenant_name": current_tenant.name,
+            "owner_email": current_user.email,
+            "action": "account_closure",
+        },
+        status=AuditStatus.SUCCESS,
+        request=request
+    )
+
+    # Delete the tenant (cascades to all related data)
+    service = TenantService(db)
+    service.hard_delete_tenant(current_tenant.id)
+
+    return {
+        "message": "Account closed successfully",
+        "tenant_name": current_tenant.name,
+        "deleted_at": "now"
     }

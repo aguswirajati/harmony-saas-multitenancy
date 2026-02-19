@@ -4,7 +4,7 @@ import pytest
 
 class TestRegister:
 
-    def test_register_creates_tenant_and_admin(self, client):
+    def test_register_creates_tenant_and_owner(self, client):
         resp = client.post("/api/v1/auth/register", json={
             "company_name": "Acme Corp",
             "subdomain": "acmecorp",
@@ -17,7 +17,8 @@ class TestRegister:
         assert data["message"] == "Registration successful"
         assert data["tenant"]["subdomain"] == "acmecorp"
         assert data["user"]["email"] == "admin@acmecorp.com"
-        assert data["user"]["role"] == "admin"
+        assert data["user"]["role"] == "owner"  # Registration creates owner
+        assert data["user"]["tenant_role"] == "owner"
         assert data["tokens"]["access_token"]
         assert data["tokens"]["refresh_token"]
 

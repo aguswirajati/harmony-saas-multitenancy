@@ -68,17 +68,18 @@ class TestLogin:
     def test_jwt_contains_correct_claims(
         self, client, tenant_with_admin,
     ):
-        tenant, _, admin = tenant_with_admin
+        tenant, _, owner = tenant_with_admin
         resp = client.post("/api/v1/auth/login", json={
-            "email": admin.email,
+            "email": owner.email,
             "password": "Test1234",
         })
         token = resp.json()["tokens"]["access_token"]
         settings = get_settings()
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        assert payload["sub"] == str(admin.id)
-        assert payload["role"] == "admin"
+        assert payload["sub"] == str(owner.id)
+        assert payload["role"] == "owner"  # tenant_with_admin creates an owner
         assert payload["tenant_id"] == str(tenant.id)
+        assert payload["tenant_role"] == "owner"
 
     def test_login_with_tenant_subdomain(
         self, client, tenant_with_admin,
