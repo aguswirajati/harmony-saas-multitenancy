@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     upgrade_requests,
     usage,
     coupons,
+    features,
 )
 
 router = APIRouter()
@@ -48,3 +49,7 @@ router.include_router(usage.internal_router)
 
 # Coupons
 router.include_router(coupons.router)
+
+# Features
+router.include_router(features.router)
+router.include_router(features.admin_router)

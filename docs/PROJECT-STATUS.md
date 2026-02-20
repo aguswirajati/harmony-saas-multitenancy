@@ -45,7 +45,7 @@
 
 ## 2. What's Implemented
 
-### Backend: 155+ API Endpoints across 20 Routers
+### Backend: 164+ API Endpoints across 22 Routers
 
 | Router | Prefix | Endpoints | Auth Required |
 |--------|--------|-----------|---------------|
@@ -69,6 +69,8 @@
 | usage (tenant) | `/api/v1/usage` | 8 (summary, quotas, trends, alerts, dismiss alert) | Tenant Admin |
 | usage (admin) | `/api/v1/admin/usage` | 8 (overview, tenant list, tenant detail, set quota, reset quota) | Super Admin |
 | coupons | `/api/v1/coupons` + `/api/v1/admin/coupons` | 15 (CRUD, validate, apply, redemptions, stats) | Varies |
+| features | `/api/v1/features` | 3 (list tenant features, check feature, detailed status) | Tenant |
+| features (admin) | `/api/v1/admin/features` | 6 (list all, matrix, update tier features, tenant features, override, reset) | Super Admin |
 | files | `/api/v1/files` | 12 (presign upload, confirm, list, get, download, update, delete, storage usage, tenant logo CRUD, user avatar CRUD) | Varies |
 | files (admin) | `/api/v1/files/admin` | 1 (admin download - view any file) | Super Admin |
 
@@ -93,7 +95,7 @@
 | BaseModel | (abstract) | id (UUID), created_at, updated_at, deleted_at, is_active, created_by_id, updated_by_id, deleted_by_id |
 | TenantScopedModel | (abstract) | Inherits BaseModel + tenant_id (CASCADE), branch_id (SET NULL) |
 
-### Backend: Services (12)
+### Backend: Services (13)
 
 | Service | Purpose |
 |---------|---------|
@@ -109,6 +111,7 @@
 | UsageService | Usage tracking, quota management, alerts, trends aggregation |
 | ProrationService | Proration calculations for mid-cycle upgrades/downgrades |
 | CouponService | Coupon validation, redemption, statistics, discount application |
+| FeatureService | Tier-based feature checking, tenant feature overrides, feature matrix |
 
 ### Backend: Middleware (4)
 
@@ -305,7 +308,7 @@ Before this project can be considered a production-ready boilerplate:
 | P1-4 | **Permission Matrix Enhancement** | Extended permission system: sidebar filtering by permission, conditional rendering of create/edit/delete buttons on branches/users pages, billing-specific permissions for subscription tab and upgrade actions, quick actions permission-gated on dashboard. | ✅ Complete |
 | P1-5 | **Payment Provider Interface (Strategy Pattern)** | Abstract payment integration using Strategy Pattern. Support Stripe, Midtrans, manual payment, and other providers. User selects active provider in settings. | 🔴 Not Started |
 | P1-6 | **System Admin Profile** | Add profile link to admin user dropdown. Create system settings page (platform name, logo, organizational info). | 🔴 Not Started |
-| P1-7 | **Feature Flag Architecture** | Granular feature flag skeleton for business features. DB model for feature definitions, tenant feature assignments, tier-based feature access. | 🔴 Not Started |
+| P1-7 | **Feature Flag Architecture** | Feature registry with 30+ business features (POS, Inventory, Masterdata, Purchasing, Reports, Platform, Loyalty, HR modules). FeatureService for tier-based and tenant-override feature checking. `require_feature()` dependency for backend. `useFeature()` hook and `FeatureGate` component for frontend. API endpoints at `/api/v1/features` and `/api/v1/admin/features`. | ✅ Done |
 | P1-8 | **Admin Page Cleanup** | Removed duplicate "Upgrade Requests" tab from Subscriptions page (functionality exists in Billing page). | ✅ Complete |
 | P1-9 | **Permission Matrix Display** | Read-only permission matrix pages showing role-permission mappings. System admin sees SystemPermissions (Admin vs Operator) at `/admin/permissions`. Tenant settings shows TenantPermissions (Owner vs Admin vs Member) at `/settings?tab=permissions`. | ✅ Done |
 
@@ -320,7 +323,7 @@ Before this project can be considered a production-ready boilerplate:
 | P2-3 | **Admin Impersonate** | Super admin can impersonate tenant users for support/debugging (with audit trail) | 🔴 Not Started |
 | P2-4 | **Notification System** | Real-time notifications (WebSocket/SSE), in-app bell + dropdown, notification preferences, email digests | 🔴 Not Started |
 | P2-5 | **Internationalization (i18n)** | Support English + Bahasa Indonesia. Use `next-intl` or `react-i18next`. Language switcher, backend error i18n keys. | 🔴 Not Started |
-| P2-6 | **Tier-Feature Integration** | Link subscription tiers to feature flags. Admin can configure which features are available per tier in tier management page. | 🔴 Not Started |
+| P2-6 | **Tier-Feature Integration** | Tier features stored as feature codes in DB. Admin tier management UI with checkbox feature selection grouped by module. DEFAULT_TIERS updated with feature codes. Features loaded into auth store on login. | ✅ Done |
 
 ---
 

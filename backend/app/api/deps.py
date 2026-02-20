@@ -296,24 +296,76 @@ def get_current_tenant(
 # Feature Access Control
 # ========================================
 
-def require_feature(feature_name: str):
+def require_feature(feature_code: str):
     """
     Factory function to create dependency for checking feature access.
 
+    Uses FeatureService to check tier-based features plus tenant overrides.
+
     Usage:
-        @router.get("/", dependencies=[Depends(require_feature("inventory_module"))])
+        @router.get("/", dependencies=[Depends(require_feature("inventory.adjustments"))])
+        @router.post("/", dependencies=[Depends(require_feature("pos.terminal"))])
     """
     def check_feature(
-        tenant: Tenant = Depends(get_current_tenant)
+        tenant: Tenant = Depends(get_current_tenant),
+        db: Session = Depends(get_db),
     ):
-        if not tenant.features.get(feature_name, False):
+        from app.services.feature_service import FeatureService
+
+        if not FeatureService.has_feature(db, tenant, feature_code):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Feature '{feature_name}' is not enabled for this tenant"
+                detail=f"Feature '{feature_code}' is not available for your subscription tier"
             )
         return True
 
     return check_feature
+
+
+def require_any_feature(*feature_codes: str):
+    """
+    Require at least one of the specified features.
+
+    Usage:
+        @router.get("/", dependencies=[Depends(require_any_feature("reports.basic", "reports.advanced"))])
+    """
+    def check_features(
+        tenant: Tenant = Depends(get_current_tenant),
+        db: Session = Depends(get_db),
+    ):
+        from app.services.feature_service import FeatureService
+
+        if not FeatureService.has_any_feature(db, tenant, list(feature_codes)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"One of these features is required: {', '.join(feature_codes)}"
+            )
+        return True
+
+    return check_features
+
+
+def require_all_features(*feature_codes: str):
+    """
+    Require all of the specified features.
+
+    Usage:
+        @router.get("/", dependencies=[Depends(require_all_features("inventory.stock", "inventory.adjustments"))])
+    """
+    def check_features(
+        tenant: Tenant = Depends(get_current_tenant),
+        db: Session = Depends(get_db),
+    ):
+        from app.services.feature_service import FeatureService
+
+        if not FeatureService.has_all_features(db, tenant, list(feature_codes)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"All of these features are required: {', '.join(feature_codes)}"
+            )
+        return True
+
+    return check_features
 
 
 # ========================================

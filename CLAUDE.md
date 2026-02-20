@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 2 (Billing & Subscription System): 100% complete.**
 
 What's built:
-- 155+ API endpoints across 20 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests, files, admin-billing, admin-revenue, usage, coupons)
+- 164+ API endpoints across 22 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests, files, admin-billing, admin-revenue, usage, coupons, features)
 - 35 frontend pages (6 public, 9 dashboard, 20 admin)
 - 14 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest, BillingTransaction, UsageRecord, UsageQuota, UsageAlert, Coupon, CouponRedemption) + BaseModel and TenantScopedModel abstract bases
-- 12 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment, Revenue, Usage, Proration, Coupon)
+- 13 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment, Revenue, Usage, Proration, Coupon, Feature)
 - 4 middleware (rate limiter, error handler, request logger, usage tracking)
 - 6 input validators (password, subdomain, email, name, SQL injection, XSS)
 - Permission matrix (RBAC with `require_permission` dependency + `usePermission` hook)
@@ -39,19 +39,19 @@ What's built:
 - ✅ P1-2: Layout redesign (shadcn sidebar, TopNavBar, UserDropdown, NotificationDropdown, DevModeButton)
 - ✅ P1-3: Simplified registration (auto-generate subdomain/company from email/name)
 - ✅ P1-4: Permission matrix enhancement (permission-based UI across all dashboard pages)
+- ✅ P1-7: Feature flag architecture (feature registry, tier-feature mapping, feature service, API endpoints)
 - ✅ P1-8: Admin page cleanup (removed duplicate upgrade requests tab from subscriptions page)
 - ✅ P1-9: Permission matrix display (read-only pages showing role-permission mappings)
 - ✅ P2-1: User profile page (edit mode, change password with eye toggle, account deletion/closure)
+- ✅ P2-6: Tier-feature integration (tier features stored as feature codes, admin UI with checkboxes)
 
 **Pending Tasks:**
 - P1-5: Payment provider interface (Strategy Pattern for Stripe/Midtrans/manual)
 - P1-6: System admin profile (profile dropdown, platform settings page)
-- P1-7: Feature flag architecture (skeleton for business features, tier integration)
 - P2-2: Branch switcher
 - P2-3: Admin impersonate
 - P2-4: Notification system
 - P2-5: Internationalization (i18n)
-- P2-6: Tier-feature integration (link tiers to feature flags)
 
 For full status and prioritized roadmap, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
 

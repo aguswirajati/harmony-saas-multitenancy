@@ -37,6 +37,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Plus, Pencil, Trash2, Star, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import type {
@@ -45,6 +52,12 @@ import type {
   SubscriptionTierUpdate,
 } from '@/types/payment';
 import { formatCurrency, formatLimit } from '@/types/payment';
+import {
+  getFeaturesByModule,
+  MODULE_NAMES,
+  type FeatureCode,
+  type FeatureModule,
+} from '@/types/features';
 
 interface TiersPageProps {
   embedded?: boolean;
@@ -74,7 +87,10 @@ export default function TiersPage({ embedded = false }: TiersPageProps) {
     is_recommended: false,
     trial_days: 0,
   });
-  const [featuresText, setFeaturesText] = useState('');
+  const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
+
+  // Get features grouped by module
+  const featuresByModule = getFeaturesByModule();
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-tiers', includeInactive],
@@ -138,7 +154,7 @@ export default function TiersPage({ embedded = false }: TiersPageProps) {
       is_recommended: false,
       trial_days: 0,
     });
-    setFeaturesText('');
+    setSelectedFeatures(new Set());
     setSelectedTier(null);
   };
 
@@ -164,7 +180,9 @@ export default function TiersPage({ embedded = false }: TiersPageProps) {
       is_recommended: tier.is_recommended,
       trial_days: tier.trial_days,
     });
-    setFeaturesText(tier.features.join('\n'));
+    // Set selected features from tier (filter for valid feature codes with dots)
+    const validFeatures = tier.features.filter((f: string) => f.includes('.'));
+    setSelectedFeatures(new Set(validFeatures));
     setIsDialogOpen(true);
   };
 
@@ -175,7 +193,7 @@ export default function TiersPage({ embedded = false }: TiersPageProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const features = featuresText.split('\n').map(f => f.trim()).filter(Boolean);
+    const features = Array.from(selectedFeatures);
     const submitData = { ...formData, features };
 
     if (selectedTier) {
@@ -183,6 +201,44 @@ export default function TiersPage({ embedded = false }: TiersPageProps) {
     } else {
       createMutation.mutate(submitData as SubscriptionTierCreate);
     }
+  };
+
+  const toggleFeature = (featureCode: string) => {
+    setSelectedFeatures(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(featureCode)) {
+        newSet.delete(featureCode);
+      } else {
+        newSet.add(featureCode);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleModule = (module: FeatureModule, checked: boolean) => {
+    const moduleFeatures = featuresByModule[module] || [];
+    setSelectedFeatures(prev => {
+      const newSet = new Set(prev);
+      moduleFeatures.forEach(f => {
+        if (checked) {
+          newSet.add(f.code);
+        } else {
+          newSet.delete(f.code);
+        }
+      });
+      return newSet;
+    });
+  };
+
+  const isModuleFullySelected = (module: FeatureModule): boolean => {
+    const moduleFeatures = featuresByModule[module] || [];
+    return moduleFeatures.every(f => selectedFeatures.has(f.code));
+  };
+
+  const isModulePartiallySelected = (module: FeatureModule): boolean => {
+    const moduleFeatures = featuresByModule[module] || [];
+    const selectedCount = moduleFeatures.filter(f => selectedFeatures.has(f.code)).length;
+    return selectedCount > 0 && selectedCount < moduleFeatures.length;
   };
 
   const tiers = data?.items || [];
@@ -471,14 +527,68 @@ export default function TiersPage({ embedded = false }: TiersPageProps) {
 
             {/* Features */}
             <div className="space-y-2">
-              <Label htmlFor="features">Features (one per line)</Label>
-              <Textarea
-                id="features"
-                value={featuresText}
-                onChange={(e) => setFeaturesText(e.target.value)}
-                placeholder="Basic Dashboard&#10;User Management&#10;Email Support"
-                rows={4}
-              />
+              <div className="flex items-center justify-between">
+                <Label>Business Features ({selectedFeatures.size} selected)</Label>
+              </div>
+              <div className="border rounded-md max-h-64 overflow-y-auto">
+                <Accordion type="multiple" className="w-full">
+                  {(Object.keys(featuresByModule) as FeatureModule[]).map((module) => {
+                    const features = featuresByModule[module];
+                    if (!features || features.length === 0) return null;
+                    const isFullySelected = isModuleFullySelected(module);
+                    const isPartiallySelected = isModulePartiallySelected(module);
+
+                    return (
+                      <AccordionItem key={module} value={module} className="border-b last:border-b-0">
+                        <AccordionTrigger className="px-4 py-2 hover:no-underline">
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={isFullySelected}
+                              ref={(el) => {
+                                if (el) {
+                                  (el as HTMLButtonElement & { indeterminate: boolean }).indeterminate = isPartiallySelected;
+                                }
+                              }}
+                              onCheckedChange={(checked) => {
+                                toggleModule(module, checked === true);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span className="font-medium">{MODULE_NAMES[module]}</span>
+                            <Badge variant="secondary" className="ml-auto mr-2">
+                              {features.filter(f => selectedFeatures.has(f.code)).length}/{features.length}
+                            </Badge>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-4 pb-2">
+                          <div className="space-y-2 pl-7">
+                            {features.map((feature) => (
+                              <div key={feature.code} className="flex items-start gap-3">
+                                <Checkbox
+                                  id={feature.code}
+                                  checked={selectedFeatures.has(feature.code)}
+                                  onCheckedChange={() => toggleFeature(feature.code)}
+                                />
+                                <div className="grid gap-0.5 leading-none">
+                                  <label
+                                    htmlFor={feature.code}
+                                    className="text-sm font-medium cursor-pointer"
+                                  >
+                                    {feature.name}
+                                  </label>
+                                  <p className="text-xs text-muted-foreground">
+                                    {feature.description}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+              </div>
             </div>
 
             {/* Display Settings */}
