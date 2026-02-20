@@ -36,5 +36,9 @@ export const branchAPI = {
     percentage: number;
   }> => {
     return apiClient.get('/tenant-settings/limits/branches');
+  },
+
+  setAsHeadquarters: async (id: string): Promise<Branch> => {
+    return apiClient.post<Branch>(`/branches/${id}/set-hq`);
   }
 };

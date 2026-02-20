@@ -14,6 +14,7 @@ interface AuthState {
   logout: () => Promise<void>;
   checkAuth: () => void;
   clearError: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -150,5 +151,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   clearError: () => {
     set({ error: null });
+  },
+
+  refreshUser: async () => {
+    try {
+      const response = await authAPI.getCurrentUser();
+      // Update the user in store and cookie
+      authAPI.setStoredUser(response);
+      set({ user: response });
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
   }
 }));

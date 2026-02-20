@@ -81,6 +81,13 @@ export const authAPI = {
     return tenantStr ? JSON.parse(tenantStr) : null;
   },
 
+  // Set user in localStorage and cookie
+  setStoredUser: (user: User) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('user', JSON.stringify(user));
+    document.cookie = `user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=604800`; // 7 days
+  },
+
   // Refresh access token using refresh token
   refreshToken: async (): Promise<{ access_token: string; refresh_token: string }> => {
     if (typeof window === 'undefined') {

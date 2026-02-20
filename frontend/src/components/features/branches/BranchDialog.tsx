@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { branchAPI } from '@/lib/api/branches';
 import { Branch, BranchCreate, BranchUpdate } from '@/types/branch';
+import { useAuthStore } from '@/lib/store/authStore';
 import {
   Dialog,
   DialogContent,
@@ -11,11 +12,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Building2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface BranchDialogProps {
   open: boolean;
@@ -25,8 +38,13 @@ interface BranchDialogProps {
 
 export function BranchDialog({ open, onClose, branch }: BranchDialogProps) {
   const isEdit = !!branch;
+  const { user } = useAuthStore();
+  const canSetHQ = user?.tenant_role === 'owner' || user?.tenant_role === 'admin';
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showHQConfirm, setShowHQConfirm] = useState(false);
+  const [settingHQ, setSettingHQ] = useState(false);
 
   const [formData, setFormData] = useState<BranchCreate>({
     name: '',
@@ -97,7 +115,8 @@ export function BranchDialog({ open, onClose, branch }: BranchDialogProps) {
       if (isEdit) {
         await branchAPI.update(branch.id, formData as BranchUpdate);
       } else {
-        await branchAPI.create(formData);
+        // For new branches, always set is_hq to false
+        await branchAPI.create({ ...formData, is_hq: false });
       }
       onClose(true); // Success
     } catch (err: unknown) {
@@ -110,7 +129,25 @@ export function BranchDialog({ open, onClose, branch }: BranchDialogProps) {
     }
   };
 
+  const handleSetAsHQ = async () => {
+    if (!branch) return;
+    setSettingHQ(true);
+
+    try {
+      await branchAPI.setAsHeadquarters(branch.id);
+      toast.success(`${branch.name} is now the headquarters`);
+      setShowHQConfirm(false);
+      onClose(true); // Success - refresh the list
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      toast.error(axiosError.response?.data?.detail || 'Failed to set as headquarters');
+    } finally {
+      setSettingHQ(false);
+    }
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -171,20 +208,28 @@ export function BranchDialog({ open, onClose, branch }: BranchDialogProps) {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="is_hq"
-                name="is_hq"
-                checked={formData.is_hq}
-                onChange={handleChange}
-                disabled={loading || (isEdit && branch?.is_hq)}
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="is_hq" className="font-normal cursor-pointer">
-                This is the headquarters branch
-              </Label>
-            </div>
+            {/* Show HQ badge or Set as HQ button for edit mode */}
+            {isEdit && (
+              <div className="flex items-center gap-3">
+                {branch?.is_hq ? (
+                  <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900">
+                    <Building2 className="h-3 w-3 mr-1" />
+                    Headquarters
+                  </Badge>
+                ) : canSetHQ ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowHQConfirm(true)}
+                    disabled={loading}
+                  >
+                    <Building2 className="h-4 w-4 mr-2" />
+                    Set as Headquarters
+                  </Button>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {/* Location */}
@@ -342,5 +387,41 @@ export function BranchDialog({ open, onClose, branch }: BranchDialogProps) {
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Set as Headquarters Confirmation */}
+    <AlertDialog open={showHQConfirm} onOpenChange={setShowHQConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Set as Headquarters?
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Are you sure you want to set <strong className="text-foreground">{branch?.name}</strong> as the new headquarters?
+              </p>
+              <p>
+                The current headquarters branch will be changed to a regular branch.
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={settingHQ}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSetAsHQ} disabled={settingHQ}>
+            {settingHQ ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Setting...
+              </>
+            ) : (
+              'Set as Headquarters'
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

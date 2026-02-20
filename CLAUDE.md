@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 What's built:
 - 155+ API endpoints across 20 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests, files, admin-billing, admin-revenue, usage, coupons)
-- 31 frontend pages (6 public, 7 dashboard, 18 admin)
+- 35 frontend pages (6 public, 9 dashboard, 20 admin)
 - 14 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest, BillingTransaction, UsageRecord, UsageQuota, UsageAlert, Coupon, CouponRedemption) + BaseModel and TenantScopedModel abstract bases
 - 12 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment, Revenue, Usage, Proration, Coupon)
 - 4 middleware (rate limiter, error handler, request logger, usage tracking)
@@ -33,15 +33,25 @@ What's built:
 - Docker setup (Dockerfiles + docker-compose for local dev)
 - CI/CD (GitHub Actions for backend lint/test, frontend lint/build/e2e)
 
-**Pending Tasks (Phase 3+):**
-- P0: Fix forgot password page (broken)
-- P1: User architecture redesign (system admin vs tenant owner vs tenant team)
-- P1: Layout redesign (top nav, user dropdown, notification bell)
-- P1: Simplify registration (remove subdomain/company fields)
-- P1: Payment provider interface (Strategy Pattern for Stripe/Midtrans/manual)
-- P2: User profile page redesign (change password, account deletion)
-- P2: Branch switcher, Admin impersonate
-- P2: Notification system, i18n
+**Completed in Phase 3:**
+- ✅ P0-1: Fixed forgot password page
+- ✅ P1-1: User architecture redesign (tenant_role: owner/admin/member)
+- ✅ P1-2: Layout redesign (shadcn sidebar, TopNavBar, UserDropdown, NotificationDropdown, DevModeButton)
+- ✅ P1-3: Simplified registration (auto-generate subdomain/company from email/name)
+- ✅ P1-4: Permission matrix enhancement (permission-based UI across all dashboard pages)
+- ✅ P1-8: Admin page cleanup (removed duplicate upgrade requests tab from subscriptions page)
+- ✅ P1-9: Permission matrix display (read-only pages showing role-permission mappings)
+- ✅ P2-1: User profile page (edit mode, change password with eye toggle, account deletion/closure)
+
+**Pending Tasks:**
+- P1-5: Payment provider interface (Strategy Pattern for Stripe/Midtrans/manual)
+- P1-6: System admin profile (profile dropdown, platform settings page)
+- P1-7: Feature flag architecture (skeleton for business features, tier integration)
+- P2-2: Branch switcher
+- P2-3: Admin impersonate
+- P2-4: Notification system
+- P2-5: Internationalization (i18n)
+- P2-6: Tier-feature integration (link tiers to feature flags)
 
 For full status and prioritized roadmap, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
 
@@ -92,6 +102,7 @@ python scripts/seed_data.py
 - `REDIS_URL` - Redis connection (optional, defaults to localhost:6379)
 - `DEV_MODE` - Set `true` to disable rate limiting and enable dev tools (default: `false`)
 - `RATE_LIMIT_ENABLED` - Explicitly disable rate limiting (default: `true`)
+- `MAIL_ENABLED` - Set `false` to disable email sending for development (default: `true`). When disabled, email actions (password reset, verification, invites) still work but log instead of send.
 
 ### Frontend (Next.js)
 
@@ -707,6 +718,10 @@ if current_user_count >= tenant.max_users:
 | `frontend/src/lib/utils/format.ts` | Currency, number, date formatting utilities |
 | `frontend/src/components/theme-provider.tsx` | next-themes dark/light mode provider |
 | `frontend/src/components/dev/dev-toolbar.tsx` | Development-only debug toolbar |
+| `frontend/src/components/layout/AppSidebar.tsx` | Collapsible sidebar with shadcn components |
+| `frontend/src/components/layout/TopNavBar.tsx` | Top nav with page title, theme, user dropdown |
+| `frontend/src/components/layout/UserDropdown.tsx` | User avatar dropdown (profile, logout) |
+| `frontend/src/components/layout/route-meta.ts` | Route title/description configuration |
 | `frontend/middleware.ts` | **Critical**: Route protection & role-based redirects |
 | `frontend/src/components/ErrorBoundary.tsx` | React error boundary for graceful error handling |
 | `frontend/src/components/EmailVerificationBanner.tsx` | Email verification reminder banner |

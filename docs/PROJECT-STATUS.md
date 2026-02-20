@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-02-20 (Session 19)
+> Last updated: 2026-02-20 (Session 23)
 
 ---
 
@@ -130,7 +130,7 @@
 | SQLInjectionValidator | Detects SQL keywords, comments, injection patterns |
 | XSSValidator | Detects script tags, javascript: protocol, event handlers |
 
-### Frontend: 31 Pages
+### Frontend: 35 Pages
 
 **Public (6 pages)**:
 | Route | Purpose |
@@ -142,18 +142,19 @@
 | `/verify-email` | Verify email with token |
 | `/accept-invite` | Accept user invitation and set password |
 
-**Dashboard - Tenant Users (7 pages)**:
+**Dashboard - Tenant Users (9 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/dashboard` | Stats, usage cards, quick actions |
-| `/branches` | Branch CRUD with tier limit pre-check |
-| `/users` | User CRUD with tier limit pre-check |
-| `/settings` | Organization tab + Subscription/usage tab + Format settings tab |
+| `/branches` | Branch CRUD with tier limit pre-check, Set as HQ |
+| `/users` | User CRUD with tier limit pre-check, tenant_role (owner/admin/member) |
+| `/settings` | Organization tab + Format settings tab + Subscription tab + Permissions tab |
 | `/audit-logs` | Tenant-scoped audit log viewer (admin only) |
 | `/upgrade` | Upgrade wizard + active request management (proof preview, invoice dialog, print/PDF) |
 | `/usage` | Usage dashboard with quotas, trends, alerts |
+| `/profile` | User profile with edit mode, change password, account deletion/closure |
 
-**Admin - Super Admin (18 pages)**:
+**Admin - Super Admin (20 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/admin` | Dashboard with system stats |
@@ -175,18 +176,33 @@
 | `/admin/revenue` | Revenue analytics (MRR, ARR, churn, trends, CSV export) |
 | `/admin/usage` | System-wide usage overview, per-tenant quotas |
 | `/admin/coupons` | Coupon management (CRUD, statistics, redemptions) |
+| `/admin/permissions` | Permission matrix display (System roles vs SystemPermissions) |
 
 ### Frontend: Key Components
 
+**Layout Components** (P1-2):
+- **AppSidebar** - Collapsible sidebar with shadcn components, mobile drawer support
+- **TopNavBar** - Top navigation with page title, theme toggle, notifications, user dropdown
+- **Logo** - System/tenant logo with collapsed state support
+- **UserDropdown** - User avatar with profile/logout menu
+- **NotificationDropdown** - Notification bell with dropdown (placeholder)
+- **DevModeButton** - Dev mode toggle for admin (syncs with backend)
+
+**Core Components**:
 - **ThemeProvider** - next-themes dark/light mode provider
 - **ThemeToggle** - Dark/light mode toggle button
 - **DevToolbar** - Development-only toolbar showing user role, tenant info
 - **ErrorBoundary** - React class component for graceful error catching
 - **EmailVerificationBanner** - Banner for unverified users
+- **AvatarUpload** - User avatar upload with preview
+- **TenantLogoUpload** - Tenant logo upload with preview
+
+**Admin Components**:
 - **CreateTenantForm** - Multi-field tenant creation form
 - **SystemStatsGrid** - System-wide statistics display
 - **TenantDataTable** - Filterable tenant data table
 - **TenantUsageCard** - Tenant resource usage display
+
 - 50+ Radix UI-based components in `components/ui/`
 
 ### Database Migrations
@@ -274,7 +290,8 @@ Before this project can be considered a production-ready boilerplate:
 
 | ID | Task | Description | Status |
 |----|------|-------------|--------|
-| P0-1 | **Forgot password not working** | Fix `/forgot-password` page - likely email service or token flow issue | 🔴 Not Started |
+| P0-1 | **Forgot password not working** | Fix `/forgot-password` page - missing Request dependency in endpoint | ✅ Complete |
+| P0-2 | **Seed data outdated** | Comprehensive seed_data.py with tiers, payment methods, system admin, demo tenant (owner/admin/members), second tenant for multi-tenant testing. | ✅ Complete |
 
 ---
 
@@ -283,10 +300,14 @@ Before this project can be considered a production-ready boilerplate:
 | ID | Task | Description | Status |
 |----|------|-------------|--------|
 | P1-1 | **User Architecture Redesign** | System scope (System Admin, System Operator) + Tenant scope (Tenant Owner, Tenant Admin, Tenant Member). See [detailed plan](plans/P1-1-USER-ARCHITECTURE-REDESIGN.md). | ✅ Complete |
-| P1-2 | **Layout Redesign** | New layout structure: system logo top-left, top nav with page title/desc, dev_mode button, theme switcher, notification icon with dropdown, user avatar with dropdown (profile, logout) | 🔴 Not Started |
-| P1-3 | **Simplify Registration Flow** | Remove `subdomain` and `company` fields from login/register pages. Subdomain set later via tenant settings or by super admin. | 🔴 Not Started |
-| P1-4 | **Permission Matrix Enhancement** | Extend permission system to cover all boilerplate pages/features access control | 🔴 Not Started |
+| P1-2 | **Layout Redesign** | New layout structure: shadcn sidebar with collapsible mode, top nav with page title/desc, dev_mode button, theme switcher, notification dropdown, user dropdown (profile, logout). | ✅ Complete |
+| P1-3 | **Simplify Registration Flow** | Removed subdomain and company fields from registration. Auto-generates subdomain from email and company name from user name. | ✅ Complete |
+| P1-4 | **Permission Matrix Enhancement** | Extended permission system: sidebar filtering by permission, conditional rendering of create/edit/delete buttons on branches/users pages, billing-specific permissions for subscription tab and upgrade actions, quick actions permission-gated on dashboard. | ✅ Complete |
 | P1-5 | **Payment Provider Interface (Strategy Pattern)** | Abstract payment integration using Strategy Pattern. Support Stripe, Midtrans, manual payment, and other providers. User selects active provider in settings. | 🔴 Not Started |
+| P1-6 | **System Admin Profile** | Add profile link to admin user dropdown. Create system settings page (platform name, logo, organizational info). | 🔴 Not Started |
+| P1-7 | **Feature Flag Architecture** | Granular feature flag skeleton for business features. DB model for feature definitions, tenant feature assignments, tier-based feature access. | 🔴 Not Started |
+| P1-8 | **Admin Page Cleanup** | Removed duplicate "Upgrade Requests" tab from Subscriptions page (functionality exists in Billing page). | ✅ Complete |
+| P1-9 | **Permission Matrix Display** | Read-only permission matrix pages showing role-permission mappings. System admin sees SystemPermissions (Admin vs Operator) at `/admin/permissions`. Tenant settings shows TenantPermissions (Owner vs Admin vs Member) at `/settings?tab=permissions`. | ✅ Done |
 
 ---
 
@@ -294,11 +315,12 @@ Before this project can be considered a production-ready boilerplate:
 
 | ID | Task | Description | Status |
 |----|------|-------------|--------|
-| P2-1 | **User Profile Page Redesign** | New profile page for both super admin and tenant users. Sections: account info, change password, account deletion (with confirmation workflow). | 🔴 Not Started |
+| P2-1 | **User Profile Page Redesign** | Profile page with edit mode (name, phone), change password with visibility toggle, account deletion for members, account closure for owners (with confirmation dialogs). | ✅ Complete |
 | P2-2 | **Branch Switcher** | UI component to switch between branches within a tenant (for multi-branch tenants) | 🔴 Not Started |
 | P2-3 | **Admin Impersonate** | Super admin can impersonate tenant users for support/debugging (with audit trail) | 🔴 Not Started |
 | P2-4 | **Notification System** | Real-time notifications (WebSocket/SSE), in-app bell + dropdown, notification preferences, email digests | 🔴 Not Started |
 | P2-5 | **Internationalization (i18n)** | Support English + Bahasa Indonesia. Use `next-intl` or `react-i18next`. Language switcher, backend error i18n keys. | 🔴 Not Started |
+| P2-6 | **Tier-Feature Integration** | Link subscription tiers to feature flags. Admin can configure which features are available per tier in tier management page. | 🔴 Not Started |
 
 ---
 
@@ -344,6 +366,74 @@ Before this project can be considered a production-ready boilerplate:
 3. API Changes (7 tasks)
 4. Frontend UI Adjustments (10 tasks)
 5. Testing & Validation (6 tasks)
+
+#### P1-4: Permission Architecture
+
+**Three-Layer Permission Model:**
+
+| Layer | Scope | Roles | Permission Type | Description |
+|-------|-------|-------|-----------------|-------------|
+| **System** | Platform | Admin, Operator | `SystemPermission` | SaaS platform management |
+| **Tenant** | Business Admin | Owner, Admin, Member | `TenantPermission` | Tenant team & settings management |
+| **Business** | Features | (Future) | (Future) | Domain-specific feature permissions |
+
+**Permission Flow:**
+```
+User logs in → Has role (system_role or tenant_role)
+    → Role maps to fixed permissions (hardcoded in code)
+    → UI shows/hides elements based on permissions
+    → Backend validates with require_*_permission() dependencies
+```
+
+**Current Permission Counts:**
+- SystemPermission: 17 permissions (system.tenants.*, system.billing.*, system.tiers.*, etc.)
+- TenantPermission: 22 permissions (tenant.users.*, tenant.branches.*, tenant.billing.*, etc.)
+
+**Key Files:**
+- Backend: `backend/app/core/permissions.py` - Permission enums, role mappings, dependencies
+- Frontend: `frontend/src/hooks/use-permission.ts` - Permission hooks (useTenantPermission, useSystemPermission)
+- Frontend: `frontend/src/components/PermissionGate.tsx` - Declarative permission components
+
+**System Role Permissions:**
+
+| Permission | Admin | Operator |
+|------------|:-----:|:--------:|
+| system.tenants.* (view/create/update/delete/impersonate) | ✓ | view only |
+| system.billing.* (view/manage) | ✓ | view only |
+| system.tiers.* (view/manage) | ✓ | view only |
+| system.coupons.* (view/manage) | ✓ | view only |
+| system.users.* (view/create/update/delete) | ✓ | view only |
+| system.tools.access | ✓ | ✗ |
+| system.settings.* (view/manage) | ✓ | view only |
+| system.audit.* (view/manage) | ✓ | view only |
+| system.revenue.view | ✓ | ✓ |
+| system.usage.* (view/manage) | ✓ | view only |
+
+**Tenant Role Permissions:**
+
+| Permission | Owner | Admin | Member |
+|------------|:-----:|:-----:|:------:|
+| tenant.dashboard.view | ✓ | ✓ | ✓ |
+| tenant.users.view | ✓ | ✓ | ✓ |
+| tenant.users.create/update/delete/invite/change_role | ✓ | ✓ | ✗ |
+| tenant.branches.view | ✓ | ✓ | ✓ |
+| tenant.branches.create/update/delete | ✓ | ✓ | ✗ |
+| tenant.settings.view | ✓ | ✓ | ✓ |
+| tenant.settings.edit | ✓ | ✓ | ✗ |
+| tenant.billing.view | ✓ | ✓ | ✗ |
+| tenant.billing.manage | ✓ | ✗ | ✗ |
+| tenant.account.delete | ✓ | ✗ | ✗ |
+| tenant.audit.view | ✓ | ✓ | ✗ |
+| tenant.files.view | ✓ | ✓ | ✓ |
+| tenant.files.upload | ✓ | ✓ | ✓ |
+| tenant.files.delete | ✓ | ✓ | ✗ |
+| tenant.usage.view | ✓ | ✓ | ✓ |
+
+**Not Yet Implemented:**
+- Database-stored permissions (currently hardcoded)
+- Per-user permission overrides
+- Business feature permissions (inventory, sales, etc.)
+- Tier-based feature access (linked to subscription)
 
 #### P1-5: Payment Provider Interface
 
@@ -515,5 +605,8 @@ Before this project can be considered a production-ready boilerplate:
 | 18 | 2026-02-19 | User Architecture Planning | Created prioritized roadmap (P0-P3), discussed and finalized user architecture redesign (System scope: admin/operator, Tenant scope: owner/admin/member), created detailed 36-task implementation plan across 5 phases |
 | 19 | 2026-02-20 | User Architecture Implementation | Implemented P1-1: Database migration (new role columns, data migration, constraints), backend permission system (SystemPermission/TenantPermission enums, new dependencies), API changes (auth/user endpoints, account closure, ownership transfer), frontend core (auth store, permission hooks, middleware) |
 | 20 | 2026-02-20 | User Architecture Testing | Fixed all 118 backend tests: updated test fixtures (conftest.py), updated assertions (staff→member, admin→owner), fixed TenantService.create_tenant to use TenantRole.OWNER, fixed backward compatibility role property for system admin (returns "super_admin") |
+| 21 | 2026-02-20 | Layout Redesign & Simplified Registration | Implemented P1-2: Layout redesign with shadcn sidebar (collapsible, mobile sheet drawer, keyboard shortcuts), TopNavBar with page titles, NotificationDropdown, UserDropdown, DevModeButton, Logo components. Fixed P0-1: forgot password endpoint missing Request dependency. Added dark mode support to auth pages. Implemented P1-3: Simplified registration (removed subdomain/company fields, auto-generation). |
+| 22 | 2026-02-20 | Profile & UX Improvements | Implemented P2-1: Profile page with edit mode (name, phone), change password with eye toggle, account deletion (members) and account closure (owners). Updated user management to use tenant_role (owner/admin/member). Fixed owner role display in UserDialog. Branch dialog HQ management (Set as Headquarters button). Reorganized subscription flow (upgrade button in plans section, pending upgrade info, removed sidebar upgrade menu). |
+| 23 | 2026-02-20 | Permission Matrix Enhancement | Implemented P1-4: Permission-based UI rendering across dashboard. AppSidebar now filters nav items by tenant permissions. Branches page: create/edit/delete buttons gated by permissions. Users page: create/edit/delete buttons gated by permissions. Settings page: subscription tab visible only with billing.view, upgrade buttons only with billing.manage. Dashboard quick actions filtered by permissions. Created PermissionGate component for declarative permission checks. |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

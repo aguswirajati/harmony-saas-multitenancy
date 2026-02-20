@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { userAPI } from '@/lib/api/users';
-import { UserWithBranch, UserCreate, UserUpdate } from '@/types/user';
+import { UserWithBranch, UserCreate, UserUpdate, TenantRole } from '@/types/user';
 import { Branch } from '@/types/branch';
 import {
   Dialog,
@@ -56,7 +56,7 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
     first_name: '',
     last_name: '',
     phone: '',
-    role: 'staff',
+    tenant_role: 'member',
     default_branch_id: '',
   });
 
@@ -70,7 +70,7 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
       formData.first_name !== initialData.first_name ||
       formData.last_name !== initialData.last_name ||
       formData.phone !== initialData.phone ||
-      formData.role !== initialData.role ||
+      formData.tenant_role !== initialData.tenant_role ||
       formData.default_branch_id !== initialData.default_branch_id ||
       (!isEdit && formData.email !== initialData.email) ||
       (!isEdit && formData.password !== initialData.password)
@@ -87,7 +87,7 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
             first_name: user.first_name || '',
             last_name: user.last_name || '',
             phone: user.phone || '',
-            role: user.role,
+            tenant_role: (user.tenant_role as TenantRole) || 'member',
             default_branch_id: user.default_branch_id || '',
           }
         : {
@@ -96,7 +96,7 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
             first_name: '',
             last_name: '',
             phone: '',
-            role: 'staff',
+            tenant_role: 'member',
             default_branch_id: 'No_Branch',
           };
       setFormData(data);
@@ -132,7 +132,7 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
           first_name: formData.first_name || null,
           last_name: formData.last_name || null,
           phone: formData.phone || null,
-          role: formData.role,
+          tenant_role: formData.tenant_role,
           default_branch_id: formData.default_branch_id || null,
         };
         await userAPI.update(user.id, updateData);
@@ -331,26 +331,40 @@ export function UserDialog({ open, onClose, user, branches }: UserDialogProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="role">
+                  <Label htmlFor="tenant_role">
                     Role <span className="text-red-500">*</span>
                   </Label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(value) => handleSelectChange('role', value)}
-                    disabled={loading}
-                  >
-                    <SelectTrigger id="role">
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="staff">Staff</SelectItem>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-gray-500">
-                    Staff: Basic access | Manager: Branch management | Admin: Full access
-                  </p>
+                  {isEdit && user?.tenant_role === 'owner' ? (
+                    <>
+                      <Input
+                        value="Owner"
+                        disabled
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Owner role cannot be changed. Use &quot;Transfer Ownership&quot; to assign a new owner.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Select
+                        value={formData.tenant_role}
+                        onValueChange={(value) => handleSelectChange('tenant_role', value)}
+                        disabled={loading}
+                      >
+                        <SelectTrigger id="tenant_role">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="member">Member</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Admin: Full access | Member: Basic access
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 <div className="space-y-2">

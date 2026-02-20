@@ -96,11 +96,12 @@ export interface LoginResponse {
 }
 
 export interface RegisterRequest {
-  company_name: string;
-  subdomain: string;
   admin_email: string;
   admin_password: string;
   admin_name: string;
+  // Optional - auto-generated if not provided
+  company_name?: string;
+  subdomain?: string;
 }
 
 export interface RegisterResponse {

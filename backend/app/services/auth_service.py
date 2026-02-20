@@ -178,19 +178,40 @@ class AuthService:
 
         return {"message": "Logged out successfully"}
 
+    def _generate_subdomain(self, email: str, name: str) -> str:
+        """Generate a unique subdomain from email or name"""
+        import re
+
+        # Try to use the email local part first
+        local_part = email.split('@')[0]
+        base_subdomain = re.sub(r'[^a-z0-9]', '', local_part.lower())
+
+        # If too short, try name
+        if len(base_subdomain) < 3:
+            base_subdomain = re.sub(r'[^a-z0-9]', '', name.lower().split()[0])
+
+        # Ensure minimum length
+        if len(base_subdomain) < 3:
+            base_subdomain = "workspace"
+
+        # Truncate if too long
+        base_subdomain = base_subdomain[:20]
+
+        # Check for uniqueness and add suffix if needed
+        subdomain = base_subdomain
+        counter = 1
+        while self.db.query(Tenant).filter(Tenant.subdomain == subdomain).first():
+            subdomain = f"{base_subdomain}{counter}"
+            counter += 1
+            if counter > 999:
+                # Fallback to random suffix
+                subdomain = f"{base_subdomain}{secrets.token_hex(3)}"
+                break
+
+        return subdomain
+
     async def register(self, register_data: RegisterRequest, request: Request = None) -> RegisterResponse:
         """Register new tenant with owner user"""
-
-        # Check if subdomain already exists
-        existing_tenant = self.db.query(Tenant).filter(
-            Tenant.subdomain == register_data.subdomain
-        ).first()
-
-        if existing_tenant:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Subdomain already taken"
-            )
 
         # Check if email already exists
         existing_user = self.db.query(User).filter(
@@ -203,11 +224,33 @@ class AuthService:
                 detail="Email already registered"
             )
 
+        # Generate company name if not provided
+        company_name = register_data.company_name
+        if not company_name:
+            first_name = register_data.admin_name.split()[0]
+            company_name = f"{first_name}'s Workspace"
+
+        # Generate or validate subdomain
+        subdomain = register_data.subdomain
+        if subdomain:
+            # Check if provided subdomain already exists
+            existing_tenant = self.db.query(Tenant).filter(
+                Tenant.subdomain == subdomain
+            ).first()
+            if existing_tenant:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Subdomain already taken"
+                )
+        else:
+            # Auto-generate unique subdomain
+            subdomain = self._generate_subdomain(register_data.admin_email, register_data.admin_name)
+
         try:
             # Create tenant
             tenant = Tenant(
-                name=register_data.company_name,
-                subdomain=register_data.subdomain,
+                name=company_name,
+                subdomain=subdomain,
                 tier="free",  # Default tier
                 max_users=5,
                 max_branches=1

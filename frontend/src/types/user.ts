@@ -1,3 +1,5 @@
+export type TenantRole = 'owner' | 'admin' | 'member';
+
 export interface User {
   id: string;
   tenant_id: string;
@@ -7,7 +9,8 @@ export interface User {
   full_name: string | null;
   phone: string | null;
   avatar_url: string | null;
-  role: string;
+  role: string; // Legacy field
+  tenant_role: TenantRole | null;
   default_branch_id: string | null;
   is_active: boolean;
   is_verified: boolean;
@@ -28,7 +31,7 @@ export interface UserCreate {
   first_name?: string;
   last_name?: string;
   phone?: string;
-  role: string;
+  tenant_role: TenantRole;
   default_branch_id?: string;
 }
 
@@ -38,7 +41,7 @@ export interface UserUpdate {
   phone?: string | null;
   avatar_url?: string | null;
   default_branch_id?: string | null;
-  role?: string;
+  tenant_role?: TenantRole;
   is_active?: boolean;
 }
 

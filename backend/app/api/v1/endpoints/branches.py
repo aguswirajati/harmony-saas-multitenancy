@@ -131,3 +131,27 @@ async def delete_branch(
     )
 
     return None
+
+
+@router.post("/{branch_id}/set-hq", response_model=BranchResponse)
+async def set_as_headquarters(
+    branch_id: UUID,
+    request: Request,
+    current_user: User = Depends(get_admin_user),
+    current_tenant: Tenant = Depends(get_current_tenant),
+    db: Session = Depends(get_db)
+):
+    """
+    Set branch as headquarters (Owner/Admin only)
+
+    The current HQ branch will be demoted to a regular branch.
+    """
+    branch_service = BranchService(db)
+    branch = branch_service.set_as_headquarters(
+        branch_id=branch_id,
+        tenant_id=current_tenant.id,
+        current_user=current_user,
+        request=request
+    )
+
+    return BranchResponse.model_validate(branch)

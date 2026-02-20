@@ -1,163 +1,29 @@
 'use client';
 
-import { useAuthStore } from '@/lib/store/authStore';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  ScrollText,
-  ArrowUpCircle,
-  Activity,
-} from 'lucide-react';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-import Link from 'next/link';
-import { useState, useMemo } from 'react';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/layout/AppSidebar';
+import { TopNavBar } from '@/components/layout/TopNavBar';
 import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
-import { usePermission } from '@/hooks/use-permission';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { useAuthStore } from '@/lib/store/authStore';
 
 export default function DashboardLayoutClient({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const { user, tenant, logout } = useAuthStore();
-  const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
-  };
-
-  const canViewAudit = usePermission('audit.view');
-
-  const navigation = useMemo(() => {
-    const items = [
-      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { name: 'Branches', href: '/branches', icon: Building2 },
-      { name: 'Users', href: '/users', icon: Users },
-      { name: 'Usage', href: '/usage', icon: Activity },
-      { name: 'Settings', href: '/settings', icon: Settings },
-      { name: 'Upgrade', href: '/upgrade', icon: ArrowUpCircle },
-    ];
-    if (canViewAudit) {
-      items.push({ name: 'Audit Logs', href: '/audit-logs', icon: ScrollText });
-    }
-    return items;
-  }, [canViewAudit]);
+  const { tenant } = useAuthStore();
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md hover:bg-accent"
-          >
-            {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-          <h1 className="text-lg font-bold">{tenant?.name || 'Dashboard'}</h1>
-        </div>
-        <div className="flex items-center space-x-1">
-          <ThemeToggle />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-          >
-            <LogOut size={18} />
-          </Button>
-        </div>
-      </div>
-
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed top-0 left-0 z-40 h-screen w-64 bg-card border-r
-          transition-transform duration-300 ease-in-out
-          lg:translate-x-0
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}
-      >
-        <div className="flex flex-col h-full">
-          {/* Logo/Brand */}
-          <div className="p-6 border-b">
-            <h1 className="text-xl font-bold">
-              {tenant?.name || 'SaaS App'}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {tenant?.subdomain}.yourdomain.com
-            </p>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className="flex items-center space-x-3 px-3 py-2 rounded-md text-foreground hover:bg-accent transition-colors"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <item.icon size={20} />
-                <span>{item.name}</span>
-              </Link>
-            ))}
-          </nav>
-
-          {/* User info */}
-          <div className="p-4 border-t">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
-                {user?.full_name?.charAt(0) || user?.email.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user?.full_name || user?.email}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {user?.role}
-                </p>
-              </div>
-              <ThemeToggle />
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={handleLogout}
-            >
-              <LogOut size={16} className="mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <div className="lg:pl-64">
-        <div className="pt-16 lg:pt-0">
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar variant="dashboard" tenantName={tenant?.name} />
+        <SidebarInset>
+          <TopNavBar variant="dashboard" tenantName={tenant?.name} />
           <EmailVerificationBanner />
-          <main className="p-6">
-            {children}
-          </main>
-        </div>
-      </div>
-
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-    </div>
+          <main className="flex-1 p-6">{children}</main>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

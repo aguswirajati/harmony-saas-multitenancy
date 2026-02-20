@@ -6,14 +6,14 @@ export const userAPI = {
     skip?: number;
     limit?: number;
     search?: string;
-    role?: string;
+    tenant_role?: string;
     branch_id?: string;
   }): Promise<UserListResponse> => {
     const queryParams = new URLSearchParams();
     if (params?.skip) queryParams.append('skip', params.skip.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.role) queryParams.append('role', params.role);
+    if (params?.tenant_role) queryParams.append('tenant_role', params.tenant_role);
     if (params?.branch_id) queryParams.append('branch_id', params.branch_id);
 
     const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
@@ -48,6 +48,14 @@ export const userAPI = {
     percentage: number;
   }> => {
     return apiClient.get('/tenant-settings/limits/users');
+  },
+
+  deleteMyAccount: async (password: string): Promise<{ message: string; email: string }> => {
+    return apiClient.delete(`/users/me?password=${encodeURIComponent(password)}`);
+  },
+
+  getMe: async (): Promise<User> => {
+    return apiClient.get('/auth/me');
   }
 };
 

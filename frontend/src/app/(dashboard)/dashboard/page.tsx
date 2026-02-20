@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Building2, Users, HardDrive, TrendingUp, Settings, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { useTenantPermission } from '@/hooks/use-permission';
 
 interface TenantUsage {
   tenant_id: string;
@@ -31,6 +32,13 @@ interface TenantUsage {
 
 export default function DashboardPage() {
   const { user, tenant } = useAuthStore();
+
+  // Permission checks for quick actions
+  const canViewBranches = useTenantPermission('tenant.branches.view');
+  const canCreateBranch = useTenantPermission('tenant.branches.create');
+  const canViewUsers = useTenantPermission('tenant.users.view');
+  const canCreateUser = useTenantPermission('tenant.users.create');
+  const canViewBilling = useTenantPermission('tenant.billing.view');
 
   const { data: usage, isLoading } = useQuery({
     queryKey: ['tenant-usage'],
@@ -228,27 +236,33 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link href="/branches" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
-              <Building2 className="text-blue-600 mb-2" size={24} />
-              <h3 className="font-medium">Add Branch</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Create a new branch location
-              </p>
-            </Link>
-            <Link href="/users" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
-              <Users className="text-green-600 mb-2" size={24} />
-              <h3 className="font-medium">Invite User</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Add a new team member
-              </p>
-            </Link>
-            <Link href="/settings?tab=subscription" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
-              <Settings className="text-purple-600 mb-2" size={24} />
-              <h3 className="font-medium">Subscription</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                View plans and usage
-              </p>
-            </Link>
+            {canViewBranches && (
+              <Link href="/branches" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
+                <Building2 className="text-blue-600 mb-2" size={24} />
+                <h3 className="font-medium">{canCreateBranch ? 'Add Branch' : 'View Branches'}</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {canCreateBranch ? 'Create a new branch location' : 'View your branch locations'}
+                </p>
+              </Link>
+            )}
+            {canViewUsers && (
+              <Link href="/users" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
+                <Users className="text-green-600 mb-2" size={24} />
+                <h3 className="font-medium">{canCreateUser ? 'Invite User' : 'View Users'}</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {canCreateUser ? 'Add a new team member' : 'View your team members'}
+                </p>
+              </Link>
+            )}
+            {canViewBilling && (
+              <Link href="/settings?tab=subscription" className="p-4 border rounded-lg hover:bg-accent transition-colors text-left block">
+                <Settings className="text-purple-600 mb-2" size={24} />
+                <h3 className="font-medium">Subscription</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  View plans and usage
+                </p>
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>

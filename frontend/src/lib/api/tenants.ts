@@ -403,6 +403,21 @@ export const tenantsAPI = {
     const response = await apiClient.put<Tenant>('/tenant/settings', data);
     return response;
   },
+
+  /**
+   * Close account (Owner only - permanently deletes tenant and all data)
+   */
+  async closeAccount(data: {
+    confirmation_phrase: string;
+    password: string;
+  }): Promise<{ message: string; tenant_name: string; deleted_at: string }> {
+    const response = await apiClient.delete<{
+      message: string;
+      tenant_name: string;
+      deleted_at: string;
+    }>('/tenant-settings/account', { data });
+    return response;
+  },
 };
 
 // ============================================================================

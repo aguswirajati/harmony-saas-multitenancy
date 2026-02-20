@@ -9,20 +9,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Home, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Home, Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register, isLoading, error, clearError, isAuthenticated } = useAuthStore();
 
   const [formData, setFormData] = useState({
-    company_name: '',
-    subdomain: '',
+    admin_name: '',
     admin_email: '',
-    admin_password: '',
-    admin_name: ''
+    admin_password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState<string>('');
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -30,6 +29,20 @@ export default function RegisterPage() {
       router.push('/dashboard');
     }
   }, [isAuthenticated, router]);
+
+  // Check password strength
+  useEffect(() => {
+    const password = formData.admin_password;
+    if (password.length === 0) {
+      setPasswordStrength('');
+    } else if (password.length < 8) {
+      setPasswordStrength('Too short');
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+      setPasswordStrength('Weak');
+    } else {
+      setPasswordStrength('Strong');
+    }
+  }, [formData.admin_password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,25 +52,15 @@ export default function RegisterPage() {
       await register(formData);
       router.push('/dashboard');
     } catch (error: unknown) {
-      // Error handled by store, but log details for debugging
-      const axiosError = error as { response?: { data?: unknown; status?: number } };
+      // Error handled by store
       console.error('Register error:', error);
-      console.error('Response data:', axiosError.response?.data);
-      console.error('Response status:', axiosError.response?.status);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-
-    // Auto-format subdomain (lowercase, no spaces)
-    if (e.target.name === 'subdomain') {
-      value = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    }
-
     setFormData({
       ...formData,
-      [e.target.name]: value
+      [e.target.name]: e.target.value
     });
   };
 
@@ -75,7 +78,7 @@ export default function RegisterPage() {
             Create Account
           </CardTitle>
           <CardDescription className="text-center">
-            Register your organization and admin account
+            Get started with your free account
           </CardDescription>
         </CardHeader>
 
@@ -88,102 +91,79 @@ export default function RegisterPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="company_name">Company Name</Label>
-              <Input
-                id="company_name"
-                name="company_name"
-                type="text"
-                placeholder="Acme Corporation"
-                value={formData.company_name}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="subdomain">Subdomain</Label>
-              <div className="flex items-center space-x-2">
+              <Label htmlFor="admin_name">Full Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="subdomain"
-                  name="subdomain"
+                  id="admin_name"
+                  name="admin_name"
                   type="text"
-                  placeholder="acme"
-                  value={formData.subdomain}
+                  placeholder="John Doe"
+                  value={formData.admin_name}
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  pattern="[a-z0-9\-]+"
-                  minLength={3}
+                  className="pl-10"
                 />
-                <span className="text-sm text-muted-foreground">.yourdomain.com</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Lowercase letters, numbers, and hyphens only
-              </p>
             </div>
 
-            <div className="border-t pt-4 mt-4">
-              <h3 className="text-sm font-medium mb-3">Admin Account</h3>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="admin_name">Full Name</Label>
-                  <Input
-                    id="admin_name"
-                    name="admin_name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={formData.admin_name}
-                    onChange={handleChange}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="admin_email">Email</Label>
-                  <Input
-                    id="admin_email"
-                    name="admin_email"
-                    type="email"
-                    placeholder="john@acme.com"
-                    value={formData.admin_email}
-                    onChange={handleChange}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="admin_password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="admin_password"
-                      name="admin_password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={formData.admin_password}
-                      onChange={handleChange}
-                      required
-                      minLength={8}
-                      disabled={isLoading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Minimum 8 characters with uppercase, lowercase, and number
-                  </p>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin_email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="admin_email"
+                  name="admin_email"
+                  type="email"
+                  placeholder="john@example.com"
+                  value={formData.admin_email}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                  className="pl-10"
+                />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="admin_password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="admin_password"
+                  name="admin_password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={formData.admin_password}
+                  onChange={handleChange}
+                  required
+                  minLength={8}
+                  disabled={isLoading}
+                  className="pl-10 pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {passwordStrength && (
+                <p className={`text-xs ${
+                  passwordStrength === 'Strong' ? 'text-green-600 dark:text-green-400' :
+                  passwordStrength === 'Weak' ? 'text-yellow-600 dark:text-yellow-400' :
+                  'text-red-600 dark:text-red-400'
+                }`}>
+                  Password strength: {passwordStrength}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Minimum 8 characters with uppercase, lowercase, and number
+              </p>
             </div>
 
             <Button
@@ -200,14 +180,25 @@ export default function RegisterPage() {
                 'Create Account'
               )}
             </Button>
+
+            <p className="text-xs text-center text-muted-foreground">
+              By creating an account, you agree to our{' '}
+              <Link href="/terms" className="text-primary hover:underline">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="text-primary hover:underline">
+                Privacy Policy
+              </Link>
+            </p>
           </form>
         </CardContent>
 
         <CardFooter>
           <div className="text-sm text-center w-full text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/login" className="text-blue-600 hover:underline font-medium">
-              Login here
+            <Link href="/login" className="text-primary hover:underline font-medium">
+              Sign in
             </Link>
           </div>
         </CardFooter>

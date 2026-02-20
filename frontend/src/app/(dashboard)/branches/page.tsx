@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Edit, Trash2, Building2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { BranchDialog } from '@/components/features/branches/BranchDialog';
 import { DeleteBranchDialog } from '@/components/features/branches/DeleteBranchDialog';
+import { useTenantPermission } from '@/hooks/use-permission';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,11 @@ export default function BranchesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [total, setTotal] = useState(0);
+
+  // Permission checks
+  const canCreateBranch = useTenantPermission('tenant.branches.create');
+  const canUpdateBranch = useTenantPermission('tenant.branches.update');
+  const canDeleteBranch = useTenantPermission('tenant.branches.delete');
 
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -116,10 +122,12 @@ export default function BranchesPage() {
             Manage your organization&apos;s branch locations
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2" size={18} />
-          Add Branch
-        </Button>
+        {canCreateBranch && (
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2" size={18} />
+            Add Branch
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -200,7 +208,7 @@ export default function BranchesPage() {
               <p className="text-muted-foreground mb-4">
                 {search ? 'No branches found matching your search' : 'No branches yet'}
               </p>
-              {!search && (
+              {!search && canCreateBranch && (
                 <Button onClick={handleCreate}>
                   <Plus className="mr-2" size={18} />
                   Add Your First Branch
@@ -267,21 +275,25 @@ export default function BranchesPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(branch)}
-                          >
-                            <Edit size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(branch)}
-                            disabled={branch.is_hq}
-                          >
-                            <Trash2 size={16} className={branch.is_hq ? 'text-gray-300' : 'text-red-600'} />
-                          </Button>
+                          {canUpdateBranch && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(branch)}
+                            >
+                              <Edit size={16} />
+                            </Button>
+                          )}
+                          {canDeleteBranch && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(branch)}
+                              disabled={branch.is_hq}
+                            >
+                              <Trash2 size={16} className={branch.is_hq ? 'text-gray-300' : 'text-red-600'} />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

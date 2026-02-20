@@ -15,14 +15,14 @@ class LoginResponse(BaseModel):
     tokens: Token
 
 class RegisterRequest(BaseModel):
-    # Tenant info
-    company_name: str = Field(..., min_length=1, max_length=255)
-    subdomain: str = Field(..., min_length=3, max_length=50, pattern="^[a-z0-9-]+$")
-
-    # Admin user info
+    # Admin user info (required)
     admin_email: EmailStr
     admin_password: str = Field(..., min_length=8)
     admin_name: str = Field(..., min_length=1)
+
+    # Tenant info (optional - auto-generated if not provided)
+    company_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    subdomain: Optional[str] = Field(None, min_length=3, max_length=50, pattern="^[a-z0-9-]+$")
 
     # Validators
     @field_validator('admin_password')
@@ -33,11 +33,20 @@ class RegisterRequest(BaseModel):
     @field_validator('subdomain')
     @classmethod
     def validate_subdomain(cls, v):
+        if v is None:
+            return v
         return subdomain_validator(v)
 
-    @field_validator('admin_name', 'company_name')
+    @field_validator('admin_name')
     @classmethod
-    def validate_name(cls, v):
+    def validate_admin_name(cls, v):
+        return name_validator(v)
+
+    @field_validator('company_name')
+    @classmethod
+    def validate_company_name(cls, v):
+        if v is None:
+            return v
         return name_validator(v)
 
 class RegisterResponse(BaseModel):

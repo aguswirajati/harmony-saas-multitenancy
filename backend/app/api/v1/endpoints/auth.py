@@ -89,7 +89,8 @@ async def get_current_user_info(
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(
-    request: ForgotPasswordRequest,
+    forgot_request: ForgotPasswordRequest,
+    request: Request,
     db: Session = Depends(get_db),
     _rate_limit: None = Depends(strict_rate_limit)
 ):
@@ -100,7 +101,7 @@ async def forgot_password(
     Always returns success message (security best practice - don't reveal if email exists).
     """
     auth_service = AuthService(db)
-    return await auth_service.forgot_password(request)
+    return await auth_service.forgot_password(forgot_request, request)
 
 @router.post("/reset-password", response_model=ResetPasswordResponse)
 async def reset_password(

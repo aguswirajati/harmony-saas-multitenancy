@@ -25,10 +25,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Edit, Trash2, Users as UsersIcon, Shield, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users as UsersIcon, Shield, AlertTriangle, ArrowRight, User } from 'lucide-react';
 import { UserDialog } from '@/components/features/users/UserDialog';
 import { DeleteUserDialog } from '@/components/features/users/DeleteUserDialog';
 import { useAuthStore } from '@/lib/store/authStore';
+import { useTenantPermission } from '@/hooks/use-permission';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,11 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [total, setTotal] = useState(0);
+
+  // Permission checks
+  const canCreateUser = useTenantPermission('tenant.users.create');
+  const canUpdateUser = useTenantPermission('tenant.users.update');
+  const canDeleteUser = useTenantPermission('tenant.users.delete');
 
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -72,7 +78,7 @@ export default function UsersPage() {
       const response = await userAPI.list({
         limit: 100,
         search: search || undefined,
-        role: roleFilter !== 'all' ? roleFilter : undefined,
+        tenant_role: roleFilter !== 'all' ? roleFilter : undefined,
         branch_id: branchFilter !== 'all' ? branchFilter : undefined,
       });
       setUsers(response.users);
@@ -135,13 +141,13 @@ export default function UsersPage() {
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
+  const getRoleBadgeColor = (role: string | null) => {
     switch (role) {
-      case 'super_admin':
+      case 'owner':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900';
       case 'admin':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900';
-      case 'manager':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900';
+      case 'member':
       default:
         return 'bg-muted text-foreground hover:bg-muted';
     }
@@ -157,10 +163,12 @@ export default function UsersPage() {
             Manage team members and their access
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2" size={18} />
-          Add User
-        </Button>
+        {canCreateUser && (
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2" size={18} />
+            Add User
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -197,7 +205,7 @@ export default function UsersPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Admins</p>
                 <p className="text-2xl font-bold text-foreground mt-2">
-                  {users.filter(u => ['admin', 'super_admin'].includes(u.role)).length}
+                  {users.filter(u => ['admin', 'owner'].includes(u.tenant_role || '')).length}
                 </p>
               </div>
               <Shield className="text-purple-600" size={32} />
@@ -208,9 +216,9 @@ export default function UsersPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Staff</p>
+                <p className="text-sm font-medium text-muted-foreground">Members</p>
                 <p className="text-2xl font-bold text-foreground mt-2">
-                  {users.filter(u => u.role === 'staff').length}
+                  {users.filter(u => u.tenant_role === 'member').length}
                 </p>
               </div>
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
@@ -237,9 +245,9 @@ export default function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="owner">Owner</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="staff">Staff</SelectItem>
+                    <SelectItem value="member">Member</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -286,7 +294,7 @@ export default function UsersPage() {
                   ? 'No users found matching your filters'
                   : 'No users yet'}
               </p>
-              {!search && roleFilter === 'all' && branchFilter === 'all' && (
+              {!search && roleFilter === 'all' && branchFilter === 'all' && canCreateUser && (
                 <Button onClick={handleCreate}>
                   <Plus className="mr-2" size={18} />
                   Add Your First User
@@ -307,72 +315,92 @@ export default function UsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <span className="text-blue-600 font-semibold">
-                              {user.full_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-medium">
-                              {user.full_name || user.email.split('@')[0]}
+                  {users.map((user) => {
+                    const isCurrentUser = user.id === currentUser?.id;
+                    return (
+                      <TableRow key={user.id} className={isCurrentUser ? 'bg-primary/5' : ''}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                              <span className="text-blue-600 dark:text-blue-300 font-semibold">
+                                {user.full_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                              </span>
                             </div>
-                            {user.phone && (
-                              <div className="text-xs text-muted-foreground">{user.phone}</div>
+                            <div>
+                              <div className="font-medium flex items-center gap-2">
+                                {user.full_name || user.email.split('@')[0]}
+                                {isCurrentUser && (
+                                  <Badge variant="outline" className="text-xs py-0 px-1.5">
+                                    You
+                                  </Badge>
+                                )}
+                              </div>
+                              {user.phone && (
+                                <div className="text-xs text-muted-foreground">{user.phone}</div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">{user.email}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getRoleBadgeColor(user.tenant_role)}>
+                            {user.tenant_role || 'member'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.branch_name ? (
+                            <div className="text-sm">
+                              <div>{user.branch_name}</div>
+                              <div className="text-xs text-muted-foreground">{user.branch_code}</div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                            {user.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            {isCurrentUser ? (
+                              <Link href="/profile">
+                                <Button variant="ghost" size="sm" title="Go to your profile">
+                                  <User size={16} />
+                                </Button>
+                              </Link>
+                            ) : (
+                              <>
+                                {canUpdateUser && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEdit(user)}
+                                    title="Edit user"
+                                  >
+                                    <Edit size={16} />
+                                  </Button>
+                                )}
+                                {canDeleteUser && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDelete(user)}
+                                    title="Delete user"
+                                  >
+                                    <Trash2 size={16} className="text-red-600" />
+                                  </Button>
+                                )}
+                              </>
                             )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">{user.email}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getRoleBadgeColor(user.role)}>
-                          {user.role.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.branch_name ? (
-                          <div className="text-sm">
-                            <div>{user.branch_name}</div>
-                            <div className="text-xs text-muted-foreground">{user.branch_code}</div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                          {user.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(user)}
-                          >
-                            <Edit size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(user)}
-                            disabled={user.id === currentUser?.id}
-                          >
-                            <Trash2
-                              size={16}
-                              className={user.id === currentUser?.id ? 'text-gray-300' : 'text-red-600'}
-                            />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

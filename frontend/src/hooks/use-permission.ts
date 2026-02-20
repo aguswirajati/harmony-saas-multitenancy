@@ -207,6 +207,35 @@ export function useTenantPermission(permission: TenantPermission): boolean {
 }
 
 /**
+ * Check multiple tenant permissions at once
+ */
+export function useTenantPermissions(permissions: TenantPermission[]): boolean[] {
+  const { user } = useAuthStore();
+  if (!user || !isTenantUser(user) || !user.tenant_role) {
+    return permissions.map(() => false);
+  }
+  const perms = TENANT_ROLE_PERMISSIONS[user.tenant_role];
+  if (!perms) return permissions.map(() => false);
+  return permissions.map(p => perms.has(p));
+}
+
+/**
+ * Check if user has ANY of the specified tenant permissions
+ */
+export function useAnyTenantPermission(permissions: TenantPermission[]): boolean {
+  const results = useTenantPermissions(permissions);
+  return results.some(Boolean);
+}
+
+/**
+ * Check if user has ALL of the specified tenant permissions
+ */
+export function useAllTenantPermissions(permissions: TenantPermission[]): boolean {
+  const results = useTenantPermissions(permissions);
+  return results.every(Boolean);
+}
+
+/**
  * Check if user has a legacy permission (backward compatibility)
  */
 export function usePermission(permission: Permission): boolean {

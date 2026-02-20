@@ -10,7 +10,7 @@ import re
 
 from app.core.database import get_db
 from app.api.deps import get_super_admin_user
-from app.models.user import User
+from app.models.user import User, TenantRole, SystemRole
 from app.models.tenant import Tenant
 from app.models.branch import Branch
 from app.core.security import get_password_hash
@@ -348,24 +348,30 @@ async def seed_dummy_data(
             # Create users with different roles
             users_to_create = [
                 {
+                    "email": f"owner@{tenant.subdomain}.com",
+                    "password": "owner123",
+                    "full_name": f"{tenant.name} Owner",
+                    "first_name": f"{tenant.name}",
+                    "last_name": "Owner",
+                    "tenant_role": TenantRole.OWNER,
+                    "branch": hq_branch
+                },
+                {
                     "email": f"admin@{tenant.subdomain}.com",
                     "password": "admin123",
                     "full_name": f"{tenant.name} Admin",
-                    "role": "admin",
+                    "first_name": f"{tenant.name}",
+                    "last_name": "Admin",
+                    "tenant_role": TenantRole.ADMIN,
                     "branch": hq_branch
                 },
                 {
-                    "email": f"manager@{tenant.subdomain}.com",
-                    "password": "manager123",
-                    "full_name": f"{tenant.name} Manager",
-                    "role": "staff",
-                    "branch": hq_branch
-                },
-                {
-                    "email": f"staff@{tenant.subdomain}.com",
-                    "password": "staff123",
-                    "full_name": f"{tenant.name} Staff",
-                    "role": "staff",
+                    "email": f"member@{tenant.subdomain}.com",
+                    "password": "member123",
+                    "full_name": f"{tenant.name} Member",
+                    "first_name": f"{tenant.name}",
+                    "last_name": "Member",
+                    "tenant_role": TenantRole.MEMBER,
                     "branch": hq_branch
                 },
             ]
@@ -414,9 +420,9 @@ async def seed_dummy_data(
             "details": {
                 "tenants": [{"name": t.name, "subdomain": t.subdomain, "tier": t.tier} for t in created_tenants],
                 "sample_credentials": [
-                    {"tenant": "acme", "email": "admin@acme.com", "password": "admin123"},
-                    {"tenant": "techstart", "email": "admin@techstart.com", "password": "admin123"},
-                    {"tenant": "demo", "email": "admin@demo.com", "password": "admin123"}
+                    {"tenant": "acme", "email": "owner@acme.com", "password": "owner123", "role": "owner"},
+                    {"tenant": "techstart", "email": "owner@techstart.com", "password": "owner123", "role": "owner"},
+                    {"tenant": "demo", "email": "owner@demo.com", "password": "owner123", "role": "owner"}
                 ]
             }
         }
@@ -471,9 +477,9 @@ async def reset_database(
 
         db.commit()
 
-        # Count remaining super admins
+        # Count remaining system admins
         remaining_super_admins = db.query(User).filter(
-            User.is_super_admin == True
+            User.system_role.isnot(None)
         ).count()
 
         # Log audit event for database reset

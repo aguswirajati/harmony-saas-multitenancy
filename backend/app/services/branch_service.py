@@ -239,3 +239,58 @@ class BranchService:
         )
 
         return True
+
+    def set_as_headquarters(
+        self,
+        branch_id: UUID,
+        tenant_id: UUID,
+        current_user: User,
+        request: Request = None
+    ) -> Branch:
+        """Set a branch as the new headquarters"""
+
+        branch = self.get_branch(branch_id, tenant_id)
+
+        # Already HQ, nothing to do
+        if branch.is_hq:
+            return branch
+
+        # Find current HQ
+        current_hq = self.db.query(Branch).filter(
+            Branch.tenant_id == tenant_id,
+            Branch.is_hq == True,
+            Branch.is_active == True
+        ).first()
+
+        old_hq_name = current_hq.name if current_hq else None
+
+        # Remove HQ status from current HQ
+        if current_hq:
+            current_hq.is_hq = False
+            current_hq.updated_at = datetime.utcnow()
+
+        # Set new branch as HQ
+        branch.is_hq = True
+        branch.updated_at = datetime.utcnow()
+
+        self.db.commit()
+        self.db.refresh(branch)
+
+        # Log audit
+        AuditService.log_action(
+            db=self.db,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            action=AuditAction.BRANCH_UPDATED,
+            resource="branch",
+            resource_id=branch.id,
+            details={
+                "action": "set_as_headquarters",
+                "new_hq": branch.name,
+                "previous_hq": old_hq_name
+            },
+            status=AuditStatus.SUCCESS,
+            request=request
+        )
+
+        return branch

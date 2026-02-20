@@ -97,12 +97,12 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1 text-center">
             <div className="flex justify-center mb-4">
-              <div className="bg-green-100 rounded-full p-3">
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <div className="bg-green-100 dark:bg-green-900/30 rounded-full p-3">
+                <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
               </div>
             </div>
             <CardTitle className="text-2xl font-bold">
@@ -114,8 +114,8 @@ function ResetPasswordForm() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-              <p className="text-sm text-blue-900">
+            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-center">
+              <p className="text-sm text-blue-900 dark:text-blue-200">
                 Redirecting to login page in 3 seconds...
               </p>
             </div>
@@ -135,12 +135,12 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1 text-center">
             <div className="flex justify-center mb-4">
-              <div className="bg-red-100 rounded-full p-3">
-                <AlertCircle className="h-8 w-8 text-red-600" />
+              <div className="bg-red-100 dark:bg-red-900/30 rounded-full p-3">
+                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
               </div>
             </div>
             <CardTitle className="text-2xl font-bold">
@@ -169,7 +169,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
@@ -191,7 +191,7 @@ function ResetPasswordForm() {
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="newPassword"
                   name="newPassword"
@@ -206,14 +206,14 @@ function ResetPasswordForm() {
               </div>
               {passwordStrength && (
                 <p className={`text-xs ${
-                  passwordStrength === 'Strong' ? 'text-green-600' :
-                  passwordStrength === 'Weak' ? 'text-yellow-600' :
-                  'text-red-600'
+                  passwordStrength === 'Strong' ? 'text-green-600 dark:text-green-400' :
+                  passwordStrength === 'Weak' ? 'text-yellow-600 dark:text-yellow-400' :
+                  'text-red-600 dark:text-red-400'
                 }`}>
                   Password strength: {passwordStrength}
                 </p>
               )}
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Must be at least 8 characters with uppercase, lowercase, and numbers
               </p>
             </div>
@@ -221,7 +221,7 @@ function ResetPasswordForm() {
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm New Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -235,7 +235,7 @@ function ResetPasswordForm() {
                 />
               </div>
               {formData.confirmPassword && formData.newPassword !== formData.confirmPassword && (
-                <p className="text-xs text-red-600">
+                <p className="text-xs text-red-600 dark:text-red-400">
                   Passwords do not match
                 </p>
               )}
@@ -259,9 +259,9 @@ function ResetPasswordForm() {
         </CardContent>
 
         <CardFooter>
-          <div className="text-sm text-center text-gray-600 w-full">
+          <div className="text-sm text-center text-muted-foreground w-full">
             Remember your password?{' '}
-            <Link href="/login" className="text-blue-600 hover:underline font-medium">
+            <Link href="/login" className="text-primary hover:underline font-medium">
               Back to Login
             </Link>
           </div>
@@ -274,8 +274,8 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     }>
       <ResetPasswordForm />

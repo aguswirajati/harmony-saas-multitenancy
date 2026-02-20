@@ -276,6 +276,67 @@ async def transfer_ownership(
     return UserResponse.from_user(new_owner)
 
 
+@router.delete("/me", status_code=status.HTTP_200_OK)
+async def delete_my_account(
+    request: Request,
+    password: str,
+    current_user: User = Depends(get_current_user),
+    current_tenant: Tenant = Depends(get_current_tenant),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete own account (Member only - soft delete)
+
+    Owners must use account closure endpoint instead.
+    Requires password confirmation.
+    """
+    from app.core.security import verify_password
+    from app.services.audit_service import AuditService
+    from app.models.audit_log import AuditAction, AuditStatus
+    from datetime import datetime
+
+    # Owners cannot self-delete, they must use account closure
+    if current_user.tenant_role == TenantRole.OWNER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Owners cannot delete their account. Use account closure to delete the entire tenant."
+        )
+
+    # Verify password
+    if not verify_password(password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect password"
+        )
+
+    # Log the account deletion
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        tenant_id=current_tenant.id,
+        action=AuditAction.USER_DELETED,
+        resource="user",
+        resource_id=current_user.id,
+        details={
+            "email": current_user.email,
+            "action": "self_delete",
+        },
+        status=AuditStatus.SUCCESS,
+        request=request
+    )
+
+    # Soft delete the user
+    current_user.is_active = False
+    current_user.deleted_at = datetime.utcnow()
+    current_user.deleted_by_id = current_user.id
+    db.commit()
+
+    return {
+        "message": "Account deleted successfully",
+        "email": current_user.email
+    }
+
+
 # ============================================================================
 # ADMIN ROUTES - System Users Only
 # ============================================================================
