@@ -540,26 +540,27 @@ export default function TiersPage({ embedded = false }: TiersPageProps) {
 
                     return (
                       <AccordionItem key={module} value={module} className="border-b last:border-b-0">
-                        <AccordionTrigger className="px-4 py-2 hover:no-underline">
-                          <div className="flex items-center gap-3">
-                            <Checkbox
-                              checked={isFullySelected}
-                              ref={(el) => {
-                                if (el) {
-                                  (el as HTMLButtonElement & { indeterminate: boolean }).indeterminate = isPartiallySelected;
-                                }
-                              }}
-                              onCheckedChange={(checked) => {
-                                toggleModule(module, checked === true);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <span className="font-medium">{MODULE_NAMES[module]}</span>
-                            <Badge variant="secondary" className="ml-auto mr-2">
-                              {features.filter(f => selectedFeatures.has(f.code)).length}/{features.length}
-                            </Badge>
-                          </div>
-                        </AccordionTrigger>
+                        <div className="flex items-center gap-3 px-4 py-2">
+                          <Checkbox
+                            checked={isFullySelected}
+                            ref={(el) => {
+                              if (el) {
+                                (el as HTMLButtonElement & { indeterminate: boolean }).indeterminate = isPartiallySelected;
+                              }
+                            }}
+                            onCheckedChange={(checked) => {
+                              toggleModule(module, checked === true);
+                            }}
+                          />
+                          <AccordionTrigger className="flex-1 py-0 hover:no-underline">
+                            <div className="flex items-center gap-3 flex-1">
+                              <span className="font-medium">{MODULE_NAMES[module]}</span>
+                              <Badge variant="secondary" className="ml-auto mr-2">
+                                {features.filter(f => selectedFeatures.has(f.code)).length}/{features.length}
+                              </Badge>
+                            </div>
+                          </AccordionTrigger>
+                        </div>
                         <AccordionContent className="px-4 pb-2">
                           <div className="space-y-2 pl-7">
                             {features.map((feature) => (
