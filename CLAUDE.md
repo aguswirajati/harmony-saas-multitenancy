@@ -712,6 +712,10 @@ if current_user_count >= tenant.max_users:
 | `frontend/src/lib/api/admin-revenue.ts` | Revenue analytics API calls |
 | `frontend/src/lib/api/usage.ts` | Usage metering API calls |
 | `frontend/src/lib/api/coupons.ts` | Coupon management API calls |
+| `backend/app/services/notification_service.py` | Notification CRUD, preferences, bulk operations |
+| `frontend/src/lib/api/notifications.ts` | Notification API calls |
+| `frontend/src/hooks/use-notifications.ts` | Notification hooks with React Query |
+| `frontend/src/components/layout/NotificationDropdown.tsx` | Bell dropdown with real-time count |
 | `frontend/src/lib/store/authStore.ts` | Zustand auth state store |
 | `frontend/src/hooks/use-permission.ts` | Frontend permission checking hook |
 | `frontend/src/hooks/use-format-settings.ts` | Format settings hook (React Query) |

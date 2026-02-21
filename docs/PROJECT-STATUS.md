@@ -1,7 +1,7 @@
 # Harmony SaaS - Project Status
 
 > Single source of truth for what's built, what's not, and what's next.
-> Last updated: 2026-02-20 (Session 23)
+> Last updated: 2026-02-21 (Session 24)
 
 ---
 
@@ -38,6 +38,7 @@
 | Usage metering | Done | API call tracking, quota management, usage alerts, admin usage overview |
 | Coupon system | Done | Percentage/fixed/trial discounts, redemption tracking, admin CRUD, upgrade integration |
 | Transaction Command Center | Done | Unified billing management, approve/reject, coupon/discount/bonus application, proration with bonus days |
+| Notification system | Done | In-app notifications with bell dropdown, 16 types across 6 categories, preferences, /notifications page |
 
 **Overall**: Phase 1 (Critical Foundation) is **100% complete**. Phase 2 (Billing & Subscription System) is **100% complete**.
 
