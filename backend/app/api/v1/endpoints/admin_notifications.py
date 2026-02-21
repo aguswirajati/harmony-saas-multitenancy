@@ -8,7 +8,7 @@ from typing import Optional
 from uuid import UUID
 import re
 
-from app.api.deps import get_db, get_system_admin_user
+from app.api.deps import get_db, get_super_admin_user
 from app.models.user import User
 from app.models.notification import NotificationType, NotificationPriority
 from app.services.notification_service import NotificationService
@@ -24,7 +24,7 @@ router = APIRouter()
 async def send_notification(
     data: AdminNotificationCreate,
     db: Session = Depends(get_db),
-    admin: User = Depends(get_system_admin_user),
+    admin: User = Depends(get_super_admin_user),
 ):
     """
     Send a system notification.
@@ -113,7 +113,7 @@ async def send_notification(
 async def get_notification_stats(
     tenant_id: Optional[UUID] = Query(None),
     db: Session = Depends(get_db),
-    admin: User = Depends(get_system_admin_user),
+    admin: User = Depends(get_super_admin_user),
 ):
     """Get notification statistics (optionally for a specific tenant)"""
     service = NotificationService(db)
@@ -179,7 +179,7 @@ async def get_notification_stats(
 
 @router.get("/types")
 async def get_notification_types_admin(
-    admin: User = Depends(get_system_admin_user),
+    admin: User = Depends(get_super_admin_user),
 ):
     """Get all notification types with categories (admin view)"""
     types_by_category = {}
