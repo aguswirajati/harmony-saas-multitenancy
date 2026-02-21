@@ -33,15 +33,30 @@ async def get_system_statistics(
     total_users = db.query(User).filter(User.is_active == True).count()
     total_branches = db.query(Branch).filter(Branch.is_active == True).count()
 
-    # Users by role
-    users_by_role = db.query(
-        User.role,
+    # Users by role (system users + tenant users)
+    system_users_by_role = db.query(
+        User.system_role,
         func.count(User.id).label('count')
     ).filter(
-        User.is_active == True
-    ).group_by(User.role).all()
+        User.is_active == True,
+        User.system_role.isnot(None)
+    ).group_by(User.system_role).all()
 
-    role_breakdown = {role: count for role, count in users_by_role}
+    tenant_users_by_role = db.query(
+        User.tenant_role,
+        func.count(User.id).label('count')
+    ).filter(
+        User.is_active == True,
+        User.tenant_role.isnot(None)
+    ).group_by(User.tenant_role).all()
+
+    role_breakdown = {}
+    for role, count in system_users_by_role:
+        if role:
+            role_breakdown[f"system_{role.value}"] = count
+    for role, count in tenant_users_by_role:
+        if role:
+            role_breakdown[f"tenant_{role.value}"] = count
 
     # Tenants by tier
     tenants_by_tier = db.query(
