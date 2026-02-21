@@ -54,6 +54,15 @@ export interface NotificationPreferencesResponse {
 // API Functions
 // ============================================================================
 
+const EMPTY_LIST_RESPONSE: NotificationListResponse = {
+  notifications: [],
+  total: 0,
+  unread_count: 0,
+  page: 1,
+  page_size: 10,
+  total_pages: 1,
+};
+
 /**
  * List notifications with pagination and filtering
  */
@@ -63,15 +72,19 @@ export async function listNotifications(params?: {
   unread_only?: boolean;
   notification_type?: string;
 }): Promise<NotificationListResponse> {
-  const searchParams = new URLSearchParams();
-  if (params?.page) searchParams.set('page', params.page.toString());
-  if (params?.page_size) searchParams.set('page_size', params.page_size.toString());
-  if (params?.unread_only) searchParams.set('unread_only', 'true');
-  if (params?.notification_type) searchParams.set('notification_type', params.notification_type);
+  try {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.page_size) searchParams.set('page_size', params.page_size.toString());
+    if (params?.unread_only) searchParams.set('unread_only', 'true');
+    if (params?.notification_type) searchParams.set('notification_type', params.notification_type);
 
-  const query = searchParams.toString();
-  const response = await apiClient.get(`/notifications${query ? `?${query}` : ''}`);
-  return response.data;
+    const query = searchParams.toString();
+    const response = await apiClient.get(`/notifications${query ? `?${query}` : ''}`);
+    return response.data ?? EMPTY_LIST_RESPONSE;
+  } catch {
+    return EMPTY_LIST_RESPONSE;
+  }
 }
 
 /**

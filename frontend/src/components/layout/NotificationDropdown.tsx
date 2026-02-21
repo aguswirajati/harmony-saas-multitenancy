@@ -116,6 +116,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
   const { data: notificationsData, isLoading } = useNotifications({
     page: 1,
     page_size: 10,
+    enabled: isAuthenticated,
   });
 
   const markAsRead = useMarkAsRead();

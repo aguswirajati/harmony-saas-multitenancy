@@ -31,6 +31,15 @@ export const notificationKeys = {
 // Polling interval for unread count (30 seconds)
 const POLLING_INTERVAL = 30000;
 
+const EMPTY_LIST_RESPONSE = {
+  notifications: [],
+  total: 0,
+  unread_count: 0,
+  page: 1,
+  page_size: 10,
+  total_pages: 1,
+};
+
 /**
  * Hook to get paginated notifications
  */
@@ -39,11 +48,19 @@ export function useNotifications(params?: {
   page_size?: number;
   unread_only?: boolean;
   notification_type?: string;
+  enabled?: boolean;
 }) {
+  const { enabled = true, ...queryParams } = params ?? {};
+
   return useQuery({
-    queryKey: notificationKeys.list(params),
-    queryFn: () => listNotifications(params),
+    queryKey: notificationKeys.list(queryParams),
+    queryFn: async () => {
+      const result = await listNotifications(queryParams);
+      return result ?? EMPTY_LIST_RESPONSE;
+    },
     staleTime: 10000, // 10 seconds
+    placeholderData: EMPTY_LIST_RESPONSE,
+    enabled,
   });
 }
 
