@@ -53,10 +53,14 @@ export function useNotifications(params?: {
 export function useUnreadCount(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: notificationKeys.unreadCount(),
-    queryFn: getUnreadCount,
+    queryFn: async () => {
+      const result = await getUnreadCount();
+      return result ?? { unread_count: 0 };
+    },
     refetchInterval: POLLING_INTERVAL,
     staleTime: 5000,
     enabled: options?.enabled ?? true,
+    placeholderData: { unread_count: 0 },
   });
 }
 

@@ -78,8 +78,12 @@ export async function listNotifications(params?: {
  * Get unread notification count
  */
 export async function getUnreadCount(): Promise<NotificationCountResponse> {
-  const response = await apiClient.get('/notifications/count');
-  return response.data;
+  try {
+    const response = await apiClient.get('/notifications/count');
+    return response.data ?? { unread_count: 0 };
+  } catch {
+    return { unread_count: 0 };
+  }
 }
 
 /**
