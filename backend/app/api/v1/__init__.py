@@ -17,6 +17,8 @@ from app.api.v1.endpoints import (
     usage,
     coupons,
     features,
+    notifications,
+    admin_notifications,
 )
 
 router = APIRouter()
@@ -53,3 +55,7 @@ router.include_router(coupons.router)
 # Features
 router.include_router(features.router)
 router.include_router(features.admin_router)
+
+# Notifications
+router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
+router.include_router(admin_notifications.router, prefix="/admin/notifications", tags=["Admin - Notifications"])

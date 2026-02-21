@@ -53,10 +53,12 @@ Auth endpoints are rate-limited. The `X-RateLimit-*` headers indicate current us
         {"name": "Branches", "description": "Branch/location management within a tenant"},
         {"name": "Tenants", "description": "Super admin tenant management across the platform"},
         {"name": "Tenant Settings", "description": "Self-service tenant settings, usage, and limits"},
+        {"name": "Notifications", "description": "User notification management and preferences"},
         {"name": "Admin - Users", "description": "Super admin cross-tenant user queries"},
         {"name": "Admin - Stats", "description": "System-wide statistics for super admins"},
         {"name": "Admin - Tools", "description": "Development and maintenance tools (super admin only)"},
         {"name": "Admin - Audit", "description": "Audit log viewing, management, and analysis (requires audit.view permission)"},
+        {"name": "Admin - Notifications", "description": "System-wide notification management (super admin only)"},
         {"name": "Health", "description": "Service health check endpoints"},
     ]
 )

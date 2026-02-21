@@ -11,6 +11,7 @@ from app.models.upgrade_request import UpgradeRequest, UpgradeRequestStatus, Bil
 from app.models.coupon import Coupon, CouponRedemption
 from app.models.billing_transaction import BillingTransaction, TransactionStatus
 from app.models.usage import UsageRecord, UsageQuota, UsageAlert
+from app.models.notification import Notification, NotificationPreference, NotificationType, NotificationPriority, NotificationChannel
 
 # Export all models
 __all__ = [
@@ -35,4 +36,9 @@ __all__ = [
     "UsageRecord",
     "UsageQuota",
     "UsageAlert",
+    "Notification",
+    "NotificationPreference",
+    "NotificationType",
+    "NotificationPriority",
+    "NotificationChannel",
 ]

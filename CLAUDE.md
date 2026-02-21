@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 2 (Billing & Subscription System): 100% complete.**
 
 What's built:
-- 164+ API endpoints across 22 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests, files, admin-billing, admin-revenue, usage, coupons, features)
-- 35 frontend pages (6 public, 9 dashboard, 20 admin)
-- 14 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest, BillingTransaction, UsageRecord, UsageQuota, UsageAlert, Coupon, CouponRedemption) + BaseModel and TenantScopedModel abstract bases
-- 13 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment, Revenue, Usage, Proration, Coupon, Feature)
+- 180+ API endpoints across 24 routers (auth, tenants, users, branches, tenant-settings, audit, admin-tools, admin-stats, subscription-tiers, payment-methods, upgrade-requests, files, admin-billing, admin-revenue, usage, coupons, features, notifications)
+- 36 frontend pages (6 public, 10 dashboard, 20 admin)
+- 16 models (User, Tenant, Branch, AuditLog, File, SubscriptionTier, PaymentMethod, UpgradeRequest, BillingTransaction, UsageRecord, UsageQuota, UsageAlert, Coupon, CouponRedemption, Notification, NotificationPreference) + BaseModel and TenantScopedModel abstract bases
+- 14 services (Auth, Tenant, User, Branch, Audit, Email, SubscriptionTier, Payment, Revenue, Usage, Proration, Coupon, Feature, Notification)
 - 4 middleware (rate limiter, error handler, request logger, usage tracking)
 - 6 input validators (password, subdomain, email, name, SQL injection, XSS)
 - Permission matrix (RBAC with `require_permission` dependency + `usePermission` hook)
@@ -44,13 +44,13 @@ What's built:
 - ✅ P1-9: Permission matrix display (read-only pages showing role-permission mappings)
 - ✅ P2-1: User profile page (edit mode, change password with eye toggle, account deletion/closure)
 - ✅ P2-6: Tier-feature integration (tier features stored as feature codes, admin UI with checkboxes)
+- ✅ P2-4: Notification system (16 types, 6 categories, bell dropdown, preferences, /notifications page)
 
 **Pending Tasks:**
 - P1-5: Payment provider interface (Strategy Pattern for Stripe/Midtrans/manual)
 - P1-6: System admin profile (profile dropdown, platform settings page)
 - P2-2: Branch switcher
 - P2-3: Admin impersonate
-- P2-4: Notification system
 - P2-5: Internationalization (i18n)
 
 For full status and prioritized roadmap, see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).

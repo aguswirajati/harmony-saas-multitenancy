@@ -112,6 +112,8 @@ class User(Base, BaseModel):
     tenant = relationship("Tenant", back_populates="users")
     default_branch = relationship("Branch", back_populates="users")
     branch_access = relationship("UserBranchAccess", back_populates="user")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    notification_preferences = relationship("NotificationPreference", back_populates="user", cascade="all, delete-orphan")
 
     # ========================================
     # Helper properties

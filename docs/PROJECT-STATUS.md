@@ -45,7 +45,7 @@
 
 ## 2. What's Implemented
 
-### Backend: 164+ API Endpoints across 22 Routers
+### Backend: 180+ API Endpoints across 24 Routers
 
 | Router | Prefix | Endpoints | Auth Required |
 |--------|--------|-----------|---------------|
@@ -71,10 +71,12 @@
 | coupons | `/api/v1/coupons` + `/api/v1/admin/coupons` | 15 (CRUD, validate, apply, redemptions, stats) | Varies |
 | features | `/api/v1/features` | 3 (list tenant features, check feature, detailed status) | Tenant |
 | features (admin) | `/api/v1/admin/features` | 6 (list all, matrix, update tier features, tenant features, override, reset) | Super Admin |
+| notifications | `/api/v1/notifications` | 12 (list, count, types, get, mark-read, mark-all-read, delete, delete-all, preferences get/update/bulk/reset) | Authenticated |
+| notifications (admin) | `/api/v1/admin/notifications` | 3 (send, stats, types) | Super Admin |
 | files | `/api/v1/files` | 12 (presign upload, confirm, list, get, download, update, delete, storage usage, tenant logo CRUD, user avatar CRUD) | Varies |
 | files (admin) | `/api/v1/files/admin` | 1 (admin download - view any file) | Super Admin |
 
-### Backend: Models (14 concrete + 2 abstract bases)
+### Backend: Models (16 concrete + 2 abstract bases)
 
 | Model | Table | Key Fields |
 |-------|-------|------------|
@@ -93,9 +95,11 @@
 | Coupon | `coupons` | code, name, discount_type, discount_value, max_redemptions, valid_until, valid_for_tiers |
 | CouponRedemption | `coupon_redemptions` | coupon_id, tenant_id, upgrade_request_id, discount_applied, expires_at |
 | BaseModel | (abstract) | id (UUID), created_at, updated_at, deleted_at, is_active, created_by_id, updated_by_id, deleted_by_id |
+| Notification | `notifications` | user_id, tenant_id, type, title, message, priority, data (JSON), is_read, read_at, channels_sent |
+| NotificationPreference | `notification_preferences` | user_id, notification_type, in_app_enabled, email_enabled, email_digest |
 | TenantScopedModel | (abstract) | Inherits BaseModel + tenant_id (CASCADE), branch_id (SET NULL) |
 
-### Backend: Services (13)
+### Backend: Services (14)
 
 | Service | Purpose |
 |---------|---------|
@@ -112,6 +116,7 @@
 | ProrationService | Proration calculations for mid-cycle upgrades/downgrades |
 | CouponService | Coupon validation, redemption, statistics, discount application |
 | FeatureService | Tier-based feature checking, tenant feature overrides, feature matrix |
+| NotificationService | Create, list, mark read, delete notifications, preference management, bulk operations |
 
 ### Backend: Middleware (4)
 
@@ -133,7 +138,7 @@
 | SQLInjectionValidator | Detects SQL keywords, comments, injection patterns |
 | XSSValidator | Detects script tags, javascript: protocol, event handlers |
 
-### Frontend: 35 Pages
+### Frontend: 36 Pages
 
 **Public (6 pages)**:
 | Route | Purpose |
@@ -145,7 +150,7 @@
 | `/verify-email` | Verify email with token |
 | `/accept-invite` | Accept user invitation and set password |
 
-**Dashboard - Tenant Users (9 pages)**:
+**Dashboard - Tenant Users (10 pages)**:
 | Route | Purpose |
 |-------|---------|
 | `/dashboard` | Stats, usage cards, quick actions |
@@ -156,6 +161,7 @@
 | `/upgrade` | Upgrade wizard + active request management (proof preview, invoice dialog, print/PDF) |
 | `/usage` | Usage dashboard with quotas, trends, alerts |
 | `/profile` | User profile with edit mode, change password, account deletion/closure |
+| `/notifications` | Notification list with filters, mark as read, delete, notification preferences |
 
 **Admin - Super Admin (20 pages)**:
 | Route | Purpose |
@@ -225,6 +231,8 @@
 | `i4j6k7l8m9n0` | Add usage metering (usage_records, usage_quotas, usage_alerts) |
 | `j5k7l8m9n0o1` | Add coupon system (coupons, coupon_redemptions, upgrade_requests coupon fields) |
 | `k6l8m9n0o1p2` | Transaction command center (billing_transaction enhancements: discount, bonus, proration, admin actions) |
+| `l7m9n0o1p2q3` | User architecture redesign (system_role/tenant_role columns, owner per tenant constraint) |
+| `m8n0o1p2q3r4` | Notification system (notifications, notification_preferences tables) |
 
 ---
 
@@ -321,7 +329,7 @@ Before this project can be considered a production-ready boilerplate:
 | P2-1 | **User Profile Page Redesign** | Profile page with edit mode (name, phone), change password with visibility toggle, account deletion for members, account closure for owners (with confirmation dialogs). | ✅ Complete |
 | P2-2 | **Branch Switcher** | UI component to switch between branches within a tenant (for multi-branch tenants) | 🔴 Not Started |
 | P2-3 | **Admin Impersonate** | Super admin can impersonate tenant users for support/debugging (with audit trail) | 🔴 Not Started |
-| P2-4 | **Notification System** | Real-time notifications (WebSocket/SSE), in-app bell + dropdown, notification preferences, email digests | 🔴 Not Started |
+| P2-4 | **Notification System** | In-app notifications with bell dropdown, notification preferences, mark as read, delete, bulk operations. Database-backed with 16 notification types across 6 categories. | ✅ Done |
 | P2-5 | **Internationalization (i18n)** | Support English + Bahasa Indonesia. Use `next-intl` or `react-i18next`. Language switcher, backend error i18n keys. | 🔴 Not Started |
 | P2-6 | **Tier-Feature Integration** | Tier features stored as feature codes in DB. Admin tier management UI with checkbox feature selection grouped by module. DEFAULT_TIERS updated with feature codes. Features loaded into auth store on login. | ✅ Done |
 
@@ -489,11 +497,13 @@ User logs in → Has role (system_role or tenant_role)
 
 ### Features
 
-**Notifications System**
-- Real-time notifications (WebSocket or SSE)
-- In-app notification bell + dropdown
-- Notification preferences per user
-- Email notification digests
+**Notifications System** (Done)
+- ~~In-app notification bell + dropdown~~ Done (NotificationDropdown component with real data)
+- ~~Notification preferences per user~~ Done (per-category in-app/email toggles)
+- ~~Notification management page~~ Done (/notifications with list, filter, mark read, delete)
+- ~~16 notification types across 6 categories~~ Done (system, billing, user, tenant, usage, security)
+- Real-time notifications via WebSocket/SSE (deferred)
+- Email notification digests (deferred)
 
 **File Upload & Storage** (Done)
 - ~~S3-compatible file storage service~~ Done (MinIO/S3, presigned URLs, inline/download modes)
@@ -611,5 +621,6 @@ User logs in → Has role (system_role or tenant_role)
 | 21 | 2026-02-20 | Layout Redesign & Simplified Registration | Implemented P1-2: Layout redesign with shadcn sidebar (collapsible, mobile sheet drawer, keyboard shortcuts), TopNavBar with page titles, NotificationDropdown, UserDropdown, DevModeButton, Logo components. Fixed P0-1: forgot password endpoint missing Request dependency. Added dark mode support to auth pages. Implemented P1-3: Simplified registration (removed subdomain/company fields, auto-generation). |
 | 22 | 2026-02-20 | Profile & UX Improvements | Implemented P2-1: Profile page with edit mode (name, phone), change password with eye toggle, account deletion (members) and account closure (owners). Updated user management to use tenant_role (owner/admin/member). Fixed owner role display in UserDialog. Branch dialog HQ management (Set as Headquarters button). Reorganized subscription flow (upgrade button in plans section, pending upgrade info, removed sidebar upgrade menu). |
 | 23 | 2026-02-20 | Permission Matrix Enhancement | Implemented P1-4: Permission-based UI rendering across dashboard. AppSidebar now filters nav items by tenant permissions. Branches page: create/edit/delete buttons gated by permissions. Users page: create/edit/delete buttons gated by permissions. Settings page: subscription tab visible only with billing.view, upgrade buttons only with billing.manage. Dashboard quick actions filtered by permissions. Created PermissionGate component for declarative permission checks. |
+| 24 | 2026-02-21 | Feature Audit & Notifications | Created FEATURE_AUDIT_ANALYSIS.md documenting feature flag system audit. Implemented P2-4 Notification System: 2 new models (Notification, NotificationPreference), NotificationService, 15 API endpoints (user + admin), NotificationDropdown with real data, /notifications page with list/filter/preferences. 16 notification types across 6 categories (system, billing, user, tenant, usage, security). |
 
 Detailed session logs: [`docs/sessions/`](sessions/)

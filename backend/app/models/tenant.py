@@ -76,6 +76,7 @@ class Tenant(Base, BaseModel):
     # Relationships
     branches = relationship("Branch", back_populates="tenant", cascade="all, delete-orphan")
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="tenant", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Tenant {self.name} ({self.subdomain})>"
